@@ -35,12 +35,9 @@ export default function ExportPanel({
     [employees]
   );
 
-  // Server already locks exported requests, so Approved = exportable.
+  // Kissflow Completed → Approved; Vacate export log then locks as Exported.
   const pending = useMemo(
-    () =>
-      requests.filter(
-        (r) => r.status === "Approved" || r.status === "Pending Sync"
-      ),
+    () => requests.filter((r) => r.status === "Approved"),
     [requests]
   );
 

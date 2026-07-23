@@ -12,11 +12,17 @@ export default async function RegisterPage() {
         <h1 className="text-2xl font-semibold tracking-tight">Leave Register</h1>
         <p className="mt-1 text-sm text-slate-500">
           {source === "kissflow"
-            ? "Live from Kissflow — every leave request on the process"
-            : "Kissflow not connected — showing fallback data"}
+            ? "Kissflow only — live process items, no Supabase or Excel history"
+            : "Kissflow is not connected — nothing to show here"}
         </p>
       </header>
-      <RegisterTable employees={employees} requests={requests} />
+      {source === "kissflow" ? (
+        <RegisterTable employees={employees} requests={requests} />
+      ) : (
+        <div className="panel panel-pad text-sm text-slate-500">
+          Set the Kissflow env vars to load the leave register.
+        </div>
+      )}
     </div>
   );
 }

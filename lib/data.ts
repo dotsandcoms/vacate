@@ -170,20 +170,16 @@ export async function getLeaveRequests(): Promise<LeaveRequest[]> {
 }
 
 /**
- * Leave register source — Kissflow Process API only (no Supabase merge).
- * Falls back to the normal get* helpers when Kissflow is not configured.
+ * Leave register + payroll export source — Kissflow Process API only.
+ * Never merges Supabase history or mock data onto these pages.
  */
 export async function getKissflowRegister(): Promise<{
   employees: Employee[];
   requests: LeaveRequest[];
-  source: "kissflow" | "fallback";
+  source: "kissflow" | "unavailable";
 }> {
   if (!usingKissflow) {
-    const [employees, requests] = await Promise.all([
-      getEmployees(),
-      getLeaveRequests(),
-    ]);
-    return { employees, requests, source: "fallback" };
+    return { employees: [], requests: [], source: "unavailable" };
   }
   const { employees, requests } = await getKissflowData();
   return {

@@ -12,11 +12,17 @@ export default async function ExportsPage() {
         <h1 className="text-2xl font-semibold tracking-tight">Payroll Exports</h1>
         <p className="mt-1 text-sm text-slate-500">
           {source === "kissflow"
-            ? "Approved Kissflow leave ready for payroll — already processed upstream"
-            : "Kissflow not connected — showing fallback data"}
+            ? "Kissflow only — approved process items ready for payroll"
+            : "Kissflow is not connected — nothing to export"}
         </p>
       </header>
-      <ExportPanel employees={employees} requests={requests} />
+      {source === "kissflow" ? (
+        <ExportPanel employees={employees} requests={requests} />
+      ) : (
+        <div className="panel panel-pad text-sm text-slate-500">
+          Set the Kissflow env vars to load approved leave for export.
+        </div>
+      )}
     </div>
   );
 }

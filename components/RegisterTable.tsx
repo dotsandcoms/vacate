@@ -85,10 +85,16 @@ export default function RegisterTable({
     () => Object.fromEntries(employees.map((e) => [e.id, e])),
     [employees]
   );
-  const departments = useMemo(
-    () => ["All", ...Array.from(new Set(employees.map((e) => e.department))).sort()],
-    [employees]
-  );
+  const departments = useMemo(() => {
+    const values = Array.from(
+      new Set(
+        employees
+          .map((e) => e.department)
+          .filter((d) => d && d !== "—")
+      )
+    ).sort();
+    return values.length ? ["All", ...values] : [];
+  }, [employees]);
   const types = useMemo(
     () => ["All", ...Array.from(new Set(requests.map((r) => r.type))).sort()],
     [requests]
@@ -131,11 +137,13 @@ export default function RegisterTable({
             <option key={t}>{t}</option>
           ))}
         </select>
-        <select className="input-base py-2 pl-3 pr-8" value={dept} onChange={(e) => setDept(e.target.value)}>
-          {departments.map((d) => (
-            <option key={d}>{d}</option>
-          ))}
-        </select>
+        {departments.length > 0 && (
+          <select className="input-base py-2 pl-3 pr-8" value={dept} onChange={(e) => setDept(e.target.value)}>
+            {departments.map((d) => (
+              <option key={d}>{d}</option>
+            ))}
+          </select>
+        )}
         <span className="ml-auto text-xs text-slate-400">{rows.length} records</span>
       </div>
 
