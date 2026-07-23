@@ -1,0 +1,49 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  @apply bg-slate-50 text-slate-900 antialiased tracking-tightish;
+}
+
+::selection {
+  @apply bg-brand-100 text-brand-900;
+}
+
+@layer components {
+  /* The one card recipe the whole app uses — a real border plus a soft
+     two-layer shadow, instead of the flatter shadow-sm + ring-1 combo
+     repeated at every breakpoint of a generic dashboard. */
+  .panel {
+    @apply rounded-2xl border border-slate-200/70 bg-white shadow-panel;
+  }
+  .panel-pad {
+    @apply p-5;
+  }
+  .panel-pad-sm {
+    @apply p-4;
+  }
+
+  .section-title {
+    @apply font-display text-[15px] font-medium text-ink-900;
+  }
+
+  .eyebrow {
+    @apply text-[11px] font-semibold uppercase tracking-wider text-slate-400;
+  }
+
+  .stat-value {
+    @apply font-display text-[2rem] leading-none font-medium tabular-nums text-ink-900;
+  }
+  .stat-label {
+    @apply text-[11px] font-medium uppercase tracking-wider text-slate-500;
+  }
+
+  .btn-primary {
+    @apply inline-flex items-center gap-2 rounded-lg bg-ink-900 px-4 py-2 text-sm font-medium text-white shadow-panel transition-colors hover:bg-brand-700 disabled:opacity-40 disabled:cursor-not-allowed;
+  }
+
+  .input-base {
+    @apply rounded-lg border-0 bg-white text-sm shadow-panel ring-1 ring-inset ring-slate-200 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500;
+  }
+}
