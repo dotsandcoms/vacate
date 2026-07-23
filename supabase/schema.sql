@@ -11,6 +11,13 @@ create table if not exists employees (
   role text,
   annual_entitlement numeric not null default 15,
   sick_entitlement numeric not null default 30,
+  -- Excel baseline (Staff Leave register). When set, balances = opening
+  -- minus Kissflow leave starting after opening_balance_as_of (+ accrual).
+  opening_annual_balance numeric,
+  opening_sick_balance numeric,
+  opening_family_balance numeric,
+  opening_balance_as_of date,
+  excel_name text,
   created_at timestamptz not null default now()
 );
 

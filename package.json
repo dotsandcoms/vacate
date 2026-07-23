@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "import:excel": "npx tsx scripts/import-excel-baseline.ts",
+    "import:excel:apply": "npx tsx scripts/import-excel-baseline.ts --apply-supabase"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.45.0",

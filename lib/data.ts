@@ -4,6 +4,10 @@ import { employees as mockEmployees, leaveRequests as mockRequests } from "./moc
 import { getKissflowData, usingKissflow } from "./kissflow";
 import { exportedRequestIds } from "./exportlog";
 import { computeBalancesBcea } from "./balances";
+import {
+  mergeOpeningsOntoEmployees,
+  readOpeningsFile,
+} from "./openings";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -38,19 +42,35 @@ export function getSupabase() {
   });
 }
 
-async function getSupabaseEmployees(): Promise<Employee[]> {
-  const sb = getSupabase()!;
-  const { data, error } = await sb.from("employees").select("*").order("name");
-  if (error) throw error;
-  return (data ?? []).map((r: any) => ({
+function mapEmployeeRow(r: any): Employee {
+  return {
     id: r.id,
     employeeNo: r.employee_no,
     name: r.name,
     department: r.department,
     role: r.role,
-    annualEntitlement: r.annual_entitlement,
-    sickEntitlement: r.sick_entitlement,
-  }));
+    annualEntitlement: Number(r.annual_entitlement),
+    sickEntitlement: Number(r.sick_entitlement),
+    openingAnnualBalance:
+      r.opening_annual_balance != null
+        ? Number(r.opening_annual_balance)
+        : null,
+    openingSickBalance:
+      r.opening_sick_balance != null ? Number(r.opening_sick_balance) : null,
+    openingFamilyBalance:
+      r.opening_family_balance != null
+        ? Number(r.opening_family_balance)
+        : null,
+    openingBalanceAsOf: r.opening_balance_as_of ?? null,
+    excelName: r.excel_name ?? null,
+  };
+}
+
+async function getSupabaseEmployees(): Promise<Employee[]> {
+  const sb = getSupabase()!;
+  const { data, error } = await sb.from("employees").select("*").order("name");
+  if (error) throw error;
+  return (data ?? []).map(mapEmployeeRow);
 }
 
 async function getSupabaseLeaveRequests(): Promise<LeaveRequest[]> {
@@ -76,10 +96,19 @@ async function getSupabaseLeaveRequests(): Promise<LeaveRequest[]> {
   }));
 }
 
+async function withExcelOpenings(employees: Employee[]): Promise<Employee[]> {
+  const file = await readOpeningsFile();
+  return mergeOpeningsOntoEmployees(employees, file);
+}
+
 export async function getEmployees(): Promise<Employee[]> {
-  if (activeSource === "mock") return mockEmployees;
-  if (activeSource === "supabase") return getSupabaseEmployees();
-  if (activeSource === "kissflow") return (await getKissflowData()).employees;
+  if (activeSource === "mock") return withExcelOpenings(mockEmployees);
+  if (activeSource === "supabase") {
+    return withExcelOpenings(await getSupabaseEmployees());
+  }
+  if (activeSource === "kissflow") {
+    return withExcelOpenings((await getKissflowData()).employees);
+  }
 
   // "both": Supabase is the base list — it carries the real entitlement
   // data and the IDs everything else in the app is keyed on. Any Kissflow
@@ -90,7 +119,7 @@ export async function getEmployees(): Promise<Employee[]> {
   ]);
   const knownEmployeeNos = new Set(sbEmployees.map((e) => e.employeeNo));
   const extra = kf.employees.filter((e) => !knownEmployeeNos.has(e.employeeNo));
-  return [...sbEmployees, ...extra];
+  return withExcelOpenings([...sbEmployees, ...extra]);
 }
 
 /** Overlay the export audit log: anything in a batch is locked as Exported. */

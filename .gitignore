@@ -7,3 +7,6 @@ next-env.d.ts
 .build.log
 .npm-install.log
 .vacate-data/
+leavedata/baseline-raw.json
+leavedata/*.xlsx
+.DS_Store

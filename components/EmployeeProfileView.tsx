@@ -79,6 +79,14 @@ export default function EmployeeProfileView({
                 /{annualEntitled ?? "—"}
               </span>
             </div>
+            {employee.openingBalanceAsOf ? (
+              <p className="mt-2 text-[11px] text-slate-400">
+                Excel baseline {employee.openingBalanceAsOf}
+                {employee.openingAnnualBalance != null
+                  ? ` · opened at ${employee.openingAnnualBalance}`
+                  : ""}
+              </p>
+            ) : null}
           </div>
         </div>
       </header>

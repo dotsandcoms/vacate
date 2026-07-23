@@ -38,4 +38,24 @@ Opens at http://localhost:3000 — runs on **built-in mock data** until Supabase
 ## Still to come
 - Auth (Supabase Auth, manager-scoped row-level security)
 - Payroll-specific export format (waiting on payroll system confirmation)
-- Balance import from the current Excel leave tracker
+
+## Excel baseline → Kissflow live
+Balances use the Excel leave register as the **opening snapshot**, then
+Kissflow (via Supabase merge) for leave after the cutover date.
+
+1. Run the migration in Supabase SQL editor:
+   `supabase/migrations/001_opening_balances.sql`
+2. Import openings (writes `.vacate-data/excel-openings.json`):
+   ```bash
+   npm run import:excel -- --as-of 2026-06-30
+   ```
+3. Optionally push openings into Supabase employees:
+   ```bash
+   npm run import:excel:apply -- --as-of 2026-06-30
+   ```
+4. Verify a few staff:
+   ```bash
+   npx tsx scripts/verify-baseline.ts
+   ```
+
+Formula: `remaining = Excel due-as-at + (1.25 × months after cutover) − leave starting after cutover`.

@@ -23,4 +23,10 @@ export const config = {
 
   /** BCEA annual accrual: 15 working days / 12 months. */
   annualAccrualPerMonth: 1.25,
+
+  /**
+   * Default Excel cutover when an employee has openings but no as-of date.
+   * Prefer the last fully closed month before go-live.
+   */
+  excelBaselineAsOf: "2026-06-30",
 };

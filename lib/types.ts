@@ -25,6 +25,16 @@ export interface Employee {
   /** Estimated cost per working day in Rand — used for leave liability.
    *  Placeholder until real salary data is imported. */
   dailyCostR?: number;
+  /** Excel annual days remaining at cutover (due-as-at row). */
+  openingAnnualBalance?: number | null;
+  /** Excel sick days remaining at cutover. */
+  openingSickBalance?: number | null;
+  /** Excel family-responsibility days remaining at cutover. */
+  openingFamilyBalance?: number | null;
+  /** Cutover date (ISO yyyy-mm-dd). Leave starting after this reduces remaining. */
+  openingBalanceAsOf?: string | null;
+  /** Exact column header from the Excel register, if matched. */
+  excelName?: string | null;
 }
 
 export interface LeaveRequest {
