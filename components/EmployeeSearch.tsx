@@ -53,7 +53,7 @@ export default function EmployeeSearch({
         className="input-base w-56 py-2 pl-9 pr-3"
       />
       {open && q.trim() && (
-        <div className="absolute right-0 z-30 mt-1.5 w-72 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-panel-lg">
+        <div className="absolute right-0 z-30 mt-1.5 w-72 overflow-hidden rounded-xl border border-white/60 bg-white/80 shadow-panel-lg backdrop-blur-md">
           {matches.length === 0 ? (
             <p className="px-4 py-3 text-sm text-slate-400">No matches.</p>
           ) : (

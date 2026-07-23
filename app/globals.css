@@ -4,6 +4,11 @@
 
 body {
   @apply bg-slate-50 text-slate-900 antialiased tracking-tightish;
+  background-image:
+    radial-gradient(ellipse 80% 50% at 0% -10%, rgba(237, 166, 56, 0.12), transparent 55%),
+    radial-gradient(ellipse 60% 40% at 100% 0%, rgba(148, 163, 184, 0.18), transparent 50%),
+    radial-gradient(ellipse 50% 60% at 50% 100%, rgba(226, 232, 240, 0.9), transparent 60%);
+  background-attachment: fixed;
 }
 
 ::selection {
@@ -11,11 +16,9 @@ body {
 }
 
 @layer components {
-  /* The one card recipe the whole app uses — a real border plus a soft
-     two-layer shadow, instead of the flatter shadow-sm + ring-1 combo
-     repeated at every breakpoint of a generic dashboard. */
+  /* Glass cards — frosted surface used across the app */
   .panel {
-    @apply rounded-2xl border border-slate-200/70 bg-white shadow-panel;
+    @apply rounded-2xl border border-white/60 bg-white/65 shadow-panel backdrop-blur-md;
   }
   .panel-pad {
     @apply p-5;
@@ -44,6 +47,6 @@ body {
   }
 
   .input-base {
-    @apply rounded-lg border-0 bg-white text-sm shadow-panel ring-1 ring-inset ring-slate-200 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500;
+    @apply rounded-lg border-0 bg-white/70 text-sm shadow-panel ring-1 ring-inset ring-white/80 backdrop-blur-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500;
   }
 }

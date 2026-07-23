@@ -143,13 +143,13 @@ export default function RegisterTable({
         <table className="min-w-full divide-y divide-slate-100 text-sm">
           <thead>
             <tr className="text-left eyebrow">
-              <th className="sticky top-0 z-10 bg-white px-5 py-3">Employee</th>
-              <th className="sticky top-0 z-10 bg-white px-5 py-3">Type</th>
-              <th className="sticky top-0 z-10 bg-white px-5 py-3">Dates</th>
-              <th className="sticky top-0 z-10 bg-white px-5 py-3 text-right">Days</th>
-              <th className="sticky top-0 z-10 bg-white px-5 py-3">Kissflow ref</th>
-              <th className="sticky top-0 z-10 bg-white px-5 py-3">Actioned by</th>
-              <th className="sticky top-0 z-10 bg-white px-5 py-3">Status</th>
+              <th className="sticky top-0 z-10 bg-white/80 px-5 py-3 backdrop-blur-md">Employee</th>
+              <th className="sticky top-0 z-10 bg-white/80 px-5 py-3 backdrop-blur-md">Type</th>
+              <th className="sticky top-0 z-10 bg-white/80 px-5 py-3 backdrop-blur-md">Dates</th>
+              <th className="sticky top-0 z-10 bg-white/80 px-5 py-3 text-right backdrop-blur-md">Days</th>
+              <th className="sticky top-0 z-10 bg-white/80 px-5 py-3 backdrop-blur-md">Kissflow ref</th>
+              <th className="sticky top-0 z-10 bg-white/80 px-5 py-3 backdrop-blur-md">Actioned by</th>
+              <th className="sticky top-0 z-10 bg-white/80 px-5 py-3 backdrop-blur-md">Status</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-50">

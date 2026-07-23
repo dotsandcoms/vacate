@@ -1,5 +1,8 @@
 import Link from "next/link";
+import { Suspense } from "react";
+import CoverageClashes from "@/components/CoverageClashes";
 import DashboardCharts from "@/components/DashboardCharts";
+import DepartmentFilter from "@/components/DepartmentFilter";
 import NotificationBell from "@/components/NotificationBell";
 import EmployeeSearch from "@/components/EmployeeSearch";
 import Avatar from "@/components/Avatar";
@@ -21,11 +24,32 @@ import {
 
 export const dynamic = "force-dynamic";
 
-export default async function DashboardPage() {
-  const [employees, requests] = await Promise.all([
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams?: { department?: string };
+}) {
+  const [allEmployees, allRequests] = await Promise.all([
     getEmployees(),
     getLeaveRequests(),
   ]);
+
+  const departments = Array.from(
+    new Set(allEmployees.map((e) => e.department).filter(Boolean))
+  ).sort((a, b) => a.localeCompare(b));
+
+  const selectedDept = searchParams?.department?.trim() || null;
+  const department =
+    selectedDept && departments.includes(selectedDept) ? selectedDept : null;
+
+  const employees = department
+    ? allEmployees.filter((e) => e.department === department)
+    : allEmployees;
+  const employeeIds = new Set(employees.map((e) => e.id));
+  const requests = department
+    ? allRequests.filter((r) => employeeIds.has(r.employeeId))
+    : allRequests;
+
   const balances = computeBalances(employees, requests);
   const empById = Object.fromEntries(employees.map((e) => [e.id, e]));
 
@@ -50,7 +74,6 @@ export default async function DashboardPage() {
     .reduce((s, r) => s + r.days, 0);
   const leaveDaysLogged = requests.reduce((s, r) => s + r.days, 0);
 
-  // ── Stuck approvals: aging beyond threshold ────────────────────────────
   const now = Date.now();
   const stuck = awaitingApproval
     .map((r) => ({
@@ -62,21 +85,29 @@ export default async function DashboardPage() {
     .filter((r) => r.waitingDays >= config.approvalAgingDays)
     .sort((a, b) => b.waitingDays - a.waitingDays);
 
-  // ── Coverage clashes: working days with >= threshold people out ───────
-  const clashes: { date: string; names: string[] }[] = [];
+  const clashes: {
+    date: string;
+    people: { id: string; name: string }[];
+  }[] = [];
   for (let i = 0; i < 60; i++) {
     const d = addDaysIso(today, i);
     if (!isWorkingDay(d)) continue;
     const out = active.filter((r) => r.startDate <= d && r.endDate >= d);
     if (out.length >= config.clashThreshold) {
-      clashes.push({
-        date: d,
-        names: out.map((r) => empById[r.employeeId]?.name ?? "?"),
-      });
+      const seen = new Set<string>();
+      const people: { id: string; name: string }[] = [];
+      for (const r of out) {
+        if (seen.has(r.employeeId)) continue;
+        seen.add(r.employeeId);
+        people.push({
+          id: r.employeeId,
+          name: empById[r.employeeId]?.name ?? "Unknown",
+        });
+      }
+      clashes.push({ date: d, people });
     }
   }
 
-  // ── Sick-note compliance ───────────────────────────────────────────────
   const sickNoteMissing = active.filter(
     (r) =>
       r.type === "Sick" && r.days > config.sickNoteAfterDays && !r.hasAttachment
@@ -85,7 +116,6 @@ export default async function DashboardPage() {
   const visibleSickNotes = sickNoteMissing.slice(0, sickNoteVisibleLimit);
   const hiddenSickNoteCount = sickNoteMissing.length - visibleSickNotes.length;
 
-  // ── Low balances ───────────────────────────────────────────────────────
   const lowBalances = balances.filter(
     (b) => b.type === "Annual" && b.remaining <= config.lowBalanceDays
   );
@@ -97,7 +127,10 @@ export default async function DashboardPage() {
 
   const heroStats: { label: string; value: string; href?: string }[] = [
     { label: "Total employees", value: String(employees.length) },
-    { label: "Departments", value: String(departmentCount) },
+    {
+      label: department ? "Department" : "Departments",
+      value: department ? "1" : String(departmentCount),
+    },
     { label: "On leave today", value: String(onLeaveToday.length) },
     {
       label: "Awaiting approval",
@@ -116,21 +149,35 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      <header className="flex items-end justify-between">
+      <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="font-display text-2xl font-medium text-ink-900">
             {humanDate(today)}
           </h1>
-          <p className="text-sm text-slate-500 mt-1">
+          <p className="mt-1 text-sm text-slate-500">
+            {department ? (
+              <>
+                <span className="font-medium text-ink-800">{department}</span>
+                {" · "}
+              </>
+            ) : null}
             {employees.length} staff · {leaveDaysLogged} leave days on record
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <Suspense
+            fallback={
+              <div className="h-9 w-44 rounded-xl border border-white/60 bg-white/50" />
+            }
+          >
+            <DepartmentFilter
+              departments={departments}
+              selected={department}
+            />
+          </Suspense>
           <span
-            className={`inline-flex items-center gap-1.5 rounded-full border bg-white px-3 py-1 text-xs font-medium shadow-panel ${
-              isLive
-                ? "border-slate-200 text-slate-600"
-                : "border-amber-200 text-amber-700"
+            className={`inline-flex items-center gap-1.5 rounded-full border border-white/60 bg-white/70 px-3 py-1 text-xs font-medium shadow-panel backdrop-blur-md ${
+              isLive ? "text-slate-600" : "border-amber-200/80 text-amber-700"
             }`}
           >
             <span className="relative flex h-1.5 w-1.5">
@@ -151,14 +198,13 @@ export default async function DashboardPage() {
               ? "utf.kissflow.com"
               : "Sample data — Supabase not connected"}
           </span>
-          <EmployeeSearch employees={employees} />
+          <EmployeeSearch employees={allEmployees} />
           <NotificationBell />
         </div>
       </header>
 
-      {/* Hero stats */}
       <div className="panel overflow-hidden">
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 divide-y divide-x-0 sm:divide-y-0 sm:divide-x divide-slate-100">
+        <div className="grid grid-cols-2 divide-x-0 divide-y divide-slate-100 sm:grid-cols-3 sm:divide-x sm:divide-y-0 lg:grid-cols-6">
           {heroStats.map((s) => {
             const inner = (
               <div className="px-5 py-4">
@@ -181,15 +227,15 @@ export default async function DashboardPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
-        {/* Left column — the operational view */}
-        <div className="lg:col-span-2 space-y-4">
+      <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-3">
+        <div className="space-y-4 lg:col-span-2">
           <section className="panel panel-pad">
             <h2 className="section-title mb-3">Out this week</h2>
             {outThisWeek.length === 0 ? (
-              <p className="text-sm text-slate-400 py-4">
-                Full house — nobody is on approved or pending leave in the next
-                7 days.
+              <p className="py-4 text-sm text-slate-400">
+                Full house — nobody
+                {department ? ` in ${department}` : ""} is on approved or
+                pending leave in the next 7 days.
               </p>
             ) : (
               <ul className="divide-y divide-slate-100">
@@ -201,14 +247,14 @@ export default async function DashboardPage() {
                     <div className="flex min-w-0 items-center gap-3">
                       <Avatar name={empById[r.employeeId]?.name} />
                       <div className="min-w-0">
-                        <p className="text-sm font-medium truncate">
+                        <p className="truncate text-sm font-medium">
                           <Link
                             href={`/employee/${r.employeeId}`}
                             className="hover:text-brand-600 hover:underline"
                           >
                             {empById[r.employeeId]?.name}
                           </Link>
-                          <span className="text-slate-400 font-normal">
+                          <span className="font-normal text-slate-400">
                             {" "}
                             · {r.type}
                           </span>
@@ -231,37 +277,14 @@ export default async function DashboardPage() {
             )}
           </section>
 
-          <section className="panel panel-pad">
-            <h2 className="section-title mb-1">Coverage clashes</h2>
-            <p className="text-xs text-slate-400 mb-3">
-              Working days in the next 60 with {config.clashThreshold}+ staff
-              out at once
-            </p>
-            {clashes.length === 0 ? (
-              <p className="text-sm text-slate-400 py-2">
-                No clashes ahead — approved leave never has{" "}
-                {config.clashThreshold} or more people out on the same day.
-              </p>
-            ) : (
-              <ul className="space-y-1.5">
-                {clashes.slice(0, 8).map((c) => (
-                  <li key={c.date} className="flex items-baseline gap-3 text-sm">
-                    <span className="w-24 shrink-0 font-medium">
-                      {humanDate(c.date)}
-                    </span>
-                    <span className="text-slate-600">
-                      {c.names.length} out — {c.names.join(", ")}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
+          <CoverageClashes
+            clashes={clashes}
+            threshold={config.clashThreshold}
+          />
 
           <DashboardCharts requests={requests} />
         </div>
 
-        {/* Right column — exceptions that need action */}
         <div className="space-y-4">
           <section className="panel panel-pad">
             <h2 className="section-title mb-3">Stuck approvals</h2>
@@ -356,7 +379,7 @@ export default async function DashboardPage() {
                     >
                       <div className="flex min-w-0 items-center gap-3">
                         <Avatar name={empById[b.employeeId]?.name} />
-                        <p className="text-sm font-medium truncate">
+                        <p className="truncate text-sm font-medium">
                           <Link
                             href={`/employee/${b.employeeId}`}
                             className="hover:text-brand-600 hover:underline"

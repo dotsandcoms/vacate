@@ -139,15 +139,15 @@ export default function TeamCalendar({
         <table className="text-xs border-collapse min-w-full">
           <thead>
             <tr>
-              <th className="sticky left-0 top-0 z-20 bg-white px-4 py-2.5 text-left font-medium text-slate-500 min-w-48">
+              <th className="sticky left-0 top-0 z-20 min-w-48 bg-white/80 px-4 py-2.5 text-left font-medium text-slate-500 backdrop-blur-md">
                 Employee
               </th>
               {days.map((d) => (
                 <th
                   key={d.toISOString()}
-                  className={`sticky top-0 z-10 bg-white px-0.5 py-2 font-normal text-center w-8 ${
+                  className={`sticky top-0 z-10 w-8 bg-white/80 px-0.5 py-2 text-center font-normal backdrop-blur-md ${
                     isWeekend(d) ? "text-slate-300" : "text-slate-500"
-                  } ${format(d, "yyyy-MM-dd") === todayStr ? "text-brand-600 font-semibold" : ""}`}
+                  } ${format(d, "yyyy-MM-dd") === todayStr ? "font-semibold text-brand-600" : ""}`}
                 >
                   <div>{format(d, "EEEEE")}</div>
                   <div>{format(d, "d")}</div>
@@ -158,7 +158,7 @@ export default function TeamCalendar({
           <tbody>
             {visibleEmployees.map((emp) => (
               <tr key={emp.id} className="border-t border-slate-100 hover:bg-slate-50/40">
-                <td className="sticky left-0 z-10 bg-white px-4 py-2 whitespace-nowrap">
+                <td className="sticky left-0 z-10 whitespace-nowrap bg-white/80 px-4 py-2 backdrop-blur-md">
                   <div className="flex items-center gap-2.5">
                     <Avatar name={emp.name} />
                     <div>

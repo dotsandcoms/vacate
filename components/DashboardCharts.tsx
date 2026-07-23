@@ -14,7 +14,7 @@ import { typeColors } from "@/lib/utils";
 function ChartTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null;
   return (
-    <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs shadow-panel-lg">
+    <div className="rounded-lg border border-white/60 bg-white/80 px-3 py-2 text-xs shadow-panel-lg backdrop-blur-md">
       <div className="font-medium text-ink-900">{label}</div>
       <div className="mt-0.5 text-slate-500">
         {payload[0].value} day{payload[0].value === 1 ? "" : "s"}
