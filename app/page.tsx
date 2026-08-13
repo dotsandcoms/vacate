@@ -196,7 +196,7 @@ export default async function DashboardPage({
             {reportingWindowLabel()}
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex w-full flex-wrap items-center gap-3 sm:w-auto">
           <Suspense
             fallback={
               <div className="h-9 w-44 rounded-xl border border-white/60 bg-white/50" />

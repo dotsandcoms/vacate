@@ -21,10 +21,10 @@ body {
     @apply rounded-2xl border border-white/60 bg-white/65 shadow-panel backdrop-blur-md;
   }
   .panel-pad {
-    @apply p-5;
+    @apply p-4 sm:p-5;
   }
   .panel-pad-sm {
-    @apply p-4;
+    @apply p-3.5 sm:p-4;
   }
 
   .section-title {
@@ -36,17 +36,17 @@ body {
   }
 
   .stat-value {
-    @apply font-display text-[2rem] leading-none font-medium tabular-nums text-ink-900;
+    @apply font-display text-[1.65rem] leading-none font-medium tabular-nums text-ink-900 sm:text-[2rem];
   }
   .stat-label {
     @apply text-[11px] font-medium uppercase tracking-wider text-slate-500;
   }
 
   .btn-primary {
-    @apply inline-flex items-center gap-2 rounded-lg bg-ink-900 px-4 py-2 text-sm font-medium text-white shadow-panel transition-colors hover:bg-brand-700 disabled:opacity-40 disabled:cursor-not-allowed;
+    @apply inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-ink-900 px-4 py-2.5 text-base font-medium text-white shadow-panel transition-colors hover:bg-brand-700 disabled:opacity-40 disabled:cursor-not-allowed sm:w-auto sm:min-h-0 sm:py-2 sm:text-sm;
   }
 
   .input-base {
-    @apply rounded-lg border-0 bg-white/70 text-sm shadow-panel ring-1 ring-inset ring-white/80 backdrop-blur-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500;
+    @apply min-h-11 w-full rounded-lg border-0 bg-white/70 text-base shadow-panel ring-1 ring-inset ring-white/80 backdrop-blur-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-brand-500 sm:min-h-0 sm:text-sm;
   }
 }

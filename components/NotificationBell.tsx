@@ -73,7 +73,7 @@ export default function NotificationBell() {
         type="button"
         onClick={() => setOpen((o) => !o)}
         aria-label={`Notifications${unread ? ` (${unread} unread)` : ""}`}
-        className="relative rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+        className="relative inline-flex h-11 w-11 items-center justify-center rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-700 sm:h-auto sm:w-auto"
       >
         <Bell className="h-5 w-5" />
         {unread > 0 && (
@@ -84,7 +84,7 @@ export default function NotificationBell() {
       </button>
 
       {open && (
-        <div className="absolute right-0 top-11 z-50 w-96 overflow-hidden rounded-xl border border-white/60 bg-white/80 shadow-panel-lg backdrop-blur-md">
+        <div className="absolute right-0 top-11 z-50 w-[min(24rem,calc(100vw-2rem))] overflow-hidden rounded-xl border border-white/60 bg-white/80 shadow-panel-lg backdrop-blur-md">
           <div className="flex items-center justify-between border-b border-slate-100 px-4 py-2.5">
             <span className="section-title">Notifications</span>
             {unread > 0 && (

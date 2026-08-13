@@ -74,25 +74,25 @@ export default function TeamCalendar({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <button
           onClick={() => setMonth((m) => addMonths(m, -1))}
-          className="panel flex h-9 w-9 items-center justify-center text-slate-500 transition-colors hover:bg-slate-50 hover:text-ink-900"
+          className="panel flex h-11 w-11 items-center justify-center text-slate-500 transition-colors hover:bg-slate-50 hover:text-ink-900"
           aria-label="Previous month"
         >
           <ChevronLeft className="h-4 w-4" strokeWidth={1.75} />
         </button>
-        <span className="font-display w-40 text-center text-base font-medium text-ink-900">
+        <span className="font-display min-w-0 flex-1 text-center text-base font-medium text-ink-900 sm:w-40 sm:flex-none">
           {format(month, "MMMM yyyy")}
         </span>
         <button
           onClick={() => setMonth((m) => addMonths(m, 1))}
-          className="panel flex h-9 w-9 items-center justify-center text-slate-500 transition-colors hover:bg-slate-50 hover:text-ink-900"
+          className="panel flex h-11 w-11 items-center justify-center text-slate-500 transition-colors hover:bg-slate-50 hover:text-ink-900"
           aria-label="Next month"
         >
           <ChevronRight className="h-4 w-4" strokeWidth={1.75} />
         </button>
-        <div className="ml-auto flex flex-wrap gap-x-4 gap-y-1">
+        <div className="flex w-full flex-wrap gap-x-4 gap-y-1 sm:ml-auto sm:w-auto">
           {Object.entries(typeColors).map(([name, color]) => (
             <span key={name} className="inline-flex items-center gap-1.5 text-xs text-slate-600">
               <span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: color }} />
@@ -103,34 +103,34 @@ export default function TeamCalendar({
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
-        <div className="relative">
-          <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+        <div className="relative w-full sm:w-auto">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Search name or emp no…"
-            className="input-base w-64 py-2 pl-9 pr-3"
+            className="input-base w-full py-2 pl-9 pr-3 sm:w-64"
           />
         </div>
         <select
           value={dept}
           onChange={(e) => setDept(e.target.value)}
-          className="input-base py-2 pl-3 pr-8"
+          className="input-base py-2 pl-3 pr-8 sm:w-auto"
         >
           {departments.map((d) => (
             <option key={d}>{d}</option>
           ))}
         </select>
-        <label className="inline-flex cursor-pointer select-none items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-panel">
+        <label className="inline-flex min-h-11 w-full cursor-pointer select-none items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-panel sm:w-auto">
           <input
             type="checkbox"
             checked={onlyWithLeave}
             onChange={(e) => setOnlyWithLeave(e.target.checked)}
-            className="rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+            className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
           />
           On leave this month
         </label>
-        <span className="ml-auto text-xs text-slate-400">
+        <span className="w-full text-xs text-slate-400 sm:ml-auto sm:w-auto">
           {visibleEmployees.length} of {employees.length} staff
         </span>
       </div>

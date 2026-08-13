@@ -131,11 +131,11 @@ export default function ExportPanel({
 
   return (
     <div className="space-y-4">
-      <div className="panel panel-pad flex flex-wrap items-center gap-4">
-        <div className="rounded-xl bg-brand-50 p-3 text-brand-600">
+      <div className="panel panel-pad flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center">
+        <div className="rounded-xl bg-brand-50 p-3 text-brand-600 self-start">
           <FileSpreadsheet className="h-5 w-5" strokeWidth={1.75} />
         </div>
-        <div className="flex-1 min-w-48">
+        <div className="min-w-0 flex-1">
           <p className="section-title">Current batch</p>
           <p className="text-sm text-slate-500 mt-0.5">
             {pending.length} approved request{pending.length === 1 ? "" : "s"} ·{" "}
@@ -159,14 +159,14 @@ export default function ExportPanel({
       )}
 
       {pending.length > 0 && (
-        <div className="flex items-center gap-3">
-          <div className="relative">
-            <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:gap-3">
+          <div className="relative w-full sm:w-auto">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             <input
               value={q}
               onChange={(e) => setQ(e.target.value)}
               placeholder="Search name, emp no, KF ref…"
-              className="input-base w-64 py-2 pl-9 pr-3"
+              className="input-base w-full py-2 pl-9 pr-3 sm:w-64"
             />
           </div>
           <span className="text-xs text-slate-400">
@@ -176,16 +176,16 @@ export default function ExportPanel({
         </div>
       )}
 
-      <div className="panel overflow-hidden">
+      <div className="panel overflow-x-auto">
         <table className="min-w-full divide-y divide-slate-100 text-sm">
           <thead>
             <tr className="text-left eyebrow">
-              <th className="px-4 py-2.5">Emp no</th>
+              <th className="hidden px-4 py-2.5 sm:table-cell">Emp no</th>
               <th className="px-4 py-2.5">Employee</th>
               <th className="px-4 py-2.5">Type</th>
               <th className="px-4 py-2.5">Dates</th>
               <th className="px-4 py-2.5 text-right">Days</th>
-              <th className="px-4 py-2.5">Kissflow ref</th>
+              <th className="hidden px-4 py-2.5 md:table-cell">Kissflow ref</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-50">
@@ -193,7 +193,7 @@ export default function ExportPanel({
               const e = empById[r.employeeId];
               return (
                 <tr key={r.id} className="hover:bg-slate-50/60">
-                  <td className="px-4 py-2.5 text-slate-500">{e.employeeNo}</td>
+                  <td className="hidden px-4 py-2.5 text-slate-500 sm:table-cell">{e.employeeNo}</td>
                   <td className="px-4 py-2.5 font-medium">
                     <div className="flex items-center gap-2.5">
                       <Avatar name={e.name} />
@@ -210,7 +210,7 @@ export default function ExportPanel({
                     {humanRange(r.startDate, r.endDate)}
                   </td>
                   <td className="px-4 py-2.5 text-right font-medium">{r.days}</td>
-                  <td className="px-4 py-2.5 text-slate-500">{r.kissflowId}</td>
+                  <td className="hidden px-4 py-2.5 text-slate-500 md:table-cell">{r.kissflowId}</td>
                 </tr>
               );
             })}

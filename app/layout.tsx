@@ -1,10 +1,8 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
-import Sidebar from "@/components/Sidebar";
+import AppShell from "@/components/AppShell";
 
-// One friendly, rounded geometric sans used everywhere — headings, big
-// numbers, and body text alike — rather than mixing typefaces.
 const jakarta = Plus_Jakarta_Sans({
   subsets: ["latin"],
   variable: "--font-jakarta",
@@ -13,9 +11,15 @@ const jakarta = Plus_Jakarta_Sans({
 });
 
 export const metadata: Metadata = {
-  title: "Vacate — Urban Task Force Leave Management",
+  title: "UTF-Leave — Urban Task Force Leave Management System  ",
   description:
-    "Kissflow → Dashboard → Payroll, zero-touch leave management for Urban Task Force",
+    "UTF-Leave is a zero-touch leave management system for Urban Task Force. It is a web application that allows employees to apply for leave, view their leave balance, and manage their leave requests.",
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
 };
 
 export default function RootLayout({
@@ -24,12 +28,7 @@ export default function RootLayout({
   return (
     <html lang="en" className={jakarta.variable}>
       <body className="font-sans">
-        <div className="flex min-h-screen">
-          <Sidebar />
-          <main className="min-w-0 flex-1 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
-            <div className="mx-auto w-full max-w-7xl">{children}</div>
-          </main>
-        </div>
+        <AppShell>{children}</AppShell>
       </body>
     </html>
   );

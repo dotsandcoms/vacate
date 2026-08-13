@@ -35,8 +35,8 @@ export default function EmployeeSearch({
   };
 
   return (
-    <div className="relative" ref={boxRef}>
-      <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+    <div className="relative w-full sm:w-auto" ref={boxRef}>
+      <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
       <input
         value={q}
         onChange={(e) => {
@@ -50,10 +50,10 @@ export default function EmployeeSearch({
           if (e.key === "Escape") setOpen(false);
         }}
         placeholder="Find an employee…"
-        className="input-base w-56 py-2 pl-9 pr-3"
+        className="input-base w-full py-2 pl-9 pr-3 sm:w-56"
       />
       {open && q.trim() && (
-        <div className="absolute right-0 z-30 mt-1.5 w-72 overflow-hidden rounded-xl border border-white/60 bg-white/80 shadow-panel-lg backdrop-blur-md">
+        <div className="absolute left-0 right-0 z-30 mt-1.5 overflow-hidden rounded-xl border border-white/60 bg-white/80 shadow-panel-lg backdrop-blur-md sm:left-auto sm:right-0 sm:w-72">
           {matches.length === 0 ? (
             <p className="px-4 py-3 text-sm text-slate-400">No matches.</p>
           ) : (

@@ -26,13 +26,13 @@ export default function DepartmentFilter({
   };
 
   return (
-    <label className="inline-flex items-center gap-2 rounded-xl border border-white/60 bg-white/70 px-3 py-1.5 text-sm shadow-panel backdrop-blur-md">
-      <Building2 className="h-4 w-4 text-slate-400" />
+    <label className="inline-flex min-h-11 w-full items-center gap-2 rounded-xl border border-white/60 bg-white/70 px-3 py-2 text-sm shadow-panel backdrop-blur-md sm:min-h-0 sm:w-auto sm:py-1.5">
+      <Building2 className="h-4 w-4 shrink-0 text-slate-400" />
       <span className="sr-only">Filter by department</span>
       <select
         value={selected ?? ""}
         onChange={(e) => setDepartment(e.target.value)}
-        className="max-w-[14rem] cursor-pointer bg-transparent text-sm font-medium text-ink-900 outline-none"
+        className="min-w-0 flex-1 cursor-pointer bg-transparent text-base font-medium text-ink-900 outline-none sm:max-w-[14rem] sm:text-sm"
       >
         <option value="">All departments</option>
         {departments.map((d) => (

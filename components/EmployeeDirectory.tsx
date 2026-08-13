@@ -94,22 +94,22 @@ export default function EmployeeDirectory({
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-3">
-        <div className="relative">
-          <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+        <div className="relative w-full sm:w-auto">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Search name, emp no, department…"
-            className="input-base w-72 py-2 pl-9 pr-3"
+            className="input-base w-full py-2 pl-9 pr-3 sm:w-72"
           />
         </div>
-        <div className="inline-flex rounded-xl bg-white/70 p-1 ring-1 ring-inset ring-white/80">
+        <div className="inline-flex w-full rounded-xl bg-white/70 p-1 ring-1 ring-inset ring-white/80 sm:w-auto">
           {(["active", "inactive", "all"] as StatusFilter[]).map((s) => (
             <button
               key={s}
               type="button"
               onClick={() => setStatus(s)}
-              className={`rounded-lg px-3 py-1.5 text-xs font-medium capitalize ${
+              className={`min-h-10 flex-1 rounded-lg px-3 py-2 text-xs font-medium capitalize sm:flex-none sm:py-1.5 ${
                 status === s
                   ? "bg-ink-900 text-white"
                   : "text-slate-500 hover:text-ink-900"
@@ -121,7 +121,7 @@ export default function EmployeeDirectory({
         </div>
         {departments.length > 1 && (
           <select
-            className="input-base py-2 pl-3 pr-8"
+            className="input-base py-2 pl-3 pr-8 sm:w-auto"
             value={dept}
             onChange={(e) => setDept(e.target.value)}
           >
@@ -130,7 +130,7 @@ export default function EmployeeDirectory({
             ))}
           </select>
         )}
-        <span className="ml-auto text-xs text-slate-400">
+        <span className="w-full text-xs text-slate-400 sm:ml-auto sm:w-auto">
           {rows.length} shown
         </span>
       </div>
@@ -151,7 +151,7 @@ export default function EmployeeDirectory({
               <th className="sticky top-0 z-10 bg-white/80 px-5 py-3 backdrop-blur-md">
                 Department
               </th>
-              <th className="sticky top-0 z-10 bg-white/80 px-5 py-3 backdrop-blur-md">
+              <th className="sticky top-0 z-10 hidden bg-white/80 px-5 py-3 backdrop-blur-md sm:table-cell">
                 Role
               </th>
               <th className="sticky top-0 z-10 bg-white/80 px-5 py-3 backdrop-blur-md">
@@ -187,7 +187,7 @@ export default function EmployeeDirectory({
                     </div>
                   </td>
                   <td className="px-5 py-3 text-slate-600">{e.department}</td>
-                  <td className="px-5 py-3 text-slate-600">{e.role}</td>
+                  <td className="hidden px-5 py-3 text-slate-600 sm:table-cell">{e.role}</td>
                   <td className="px-5 py-3">
                     <span
                       className={`rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ${
@@ -204,7 +204,7 @@ export default function EmployeeDirectory({
                       type="button"
                       onClick={() => toggle(e)}
                       disabled={busyId === e.id}
-                      className="text-xs font-medium text-slate-500 hover:text-ink-900 disabled:opacity-40"
+                      className="min-h-10 text-xs font-medium text-slate-500 hover:text-ink-900 disabled:opacity-40"
                     >
                       {busyId === e.id
                         ? "Saving…"

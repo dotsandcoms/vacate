@@ -118,46 +118,46 @@ export default function RegisterTable({
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-3">
-        <div className="relative">
-          <Search className="pointer-events-none absolute left-3 top-2.5 h-4 w-4 text-slate-400" />
+        <div className="relative w-full sm:w-auto">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="Search name, emp no, KF ref…"
-            className="input-base w-64 py-2 pl-9 pr-3"
+            className="input-base w-full py-2 pl-9 pr-3 sm:w-64"
           />
         </div>
-        <select className="input-base py-2 pl-3 pr-8" value={status} onChange={(e) => setStatus(e.target.value)}>
+        <select className="input-base py-2 pl-3 pr-8 sm:w-auto" value={status} onChange={(e) => setStatus(e.target.value)}>
           {["All", "Awaiting Approval", "Approved", "Exported", "Rejected", "Cancelled"].map((s) => (
             <option key={s}>{s}</option>
           ))}
         </select>
-        <select className="input-base py-2 pl-3 pr-8" value={type} onChange={(e) => setType(e.target.value)}>
+        <select className="input-base py-2 pl-3 pr-8 sm:w-auto" value={type} onChange={(e) => setType(e.target.value)}>
           {types.map((t) => (
             <option key={t}>{t}</option>
           ))}
         </select>
         {departments.length > 0 && (
-          <select className="input-base py-2 pl-3 pr-8" value={dept} onChange={(e) => setDept(e.target.value)}>
+          <select className="input-base py-2 pl-3 pr-8 sm:w-auto" value={dept} onChange={(e) => setDept(e.target.value)}>
             {departments.map((d) => (
               <option key={d}>{d}</option>
             ))}
           </select>
         )}
-        <span className="ml-auto text-xs text-slate-400">{rows.length} records</span>
+        <span className="w-full text-xs text-slate-400 sm:ml-auto sm:w-auto">{rows.length} records</span>
       </div>
 
       <div className="panel max-h-[70vh] overflow-auto">
         <table className="min-w-full divide-y divide-slate-100 text-sm">
           <thead>
             <tr className="text-left eyebrow">
-              <th className="sticky top-0 z-10 bg-white/80 px-5 py-3 backdrop-blur-md">Employee</th>
-              <th className="sticky top-0 z-10 bg-white/80 px-5 py-3 backdrop-blur-md">Type</th>
-              <th className="sticky top-0 z-10 bg-white/80 px-5 py-3 backdrop-blur-md">Dates</th>
-              <th className="sticky top-0 z-10 bg-white/80 px-5 py-3 text-right backdrop-blur-md">Days</th>
-              <th className="sticky top-0 z-10 bg-white/80 px-5 py-3 backdrop-blur-md">Kissflow ref</th>
-              <th className="sticky top-0 z-10 bg-white/80 px-5 py-3 backdrop-blur-md">Actioned by</th>
-              <th className="sticky top-0 z-10 bg-white/80 px-5 py-3 backdrop-blur-md">Status</th>
+              <th className="sticky top-0 z-10 bg-white/80 px-3 py-3 backdrop-blur-md sm:px-5">Employee</th>
+              <th className="sticky top-0 z-10 hidden bg-white/80 px-5 py-3 backdrop-blur-md sm:table-cell">Type</th>
+              <th className="sticky top-0 z-10 bg-white/80 px-3 py-3 backdrop-blur-md sm:px-5">Dates</th>
+              <th className="sticky top-0 z-10 hidden bg-white/80 px-5 py-3 text-right backdrop-blur-md md:table-cell">Days</th>
+              <th className="sticky top-0 z-10 hidden bg-white/80 px-5 py-3 backdrop-blur-md lg:table-cell">Kissflow ref</th>
+              <th className="sticky top-0 z-10 hidden bg-white/80 px-5 py-3 backdrop-blur-md lg:table-cell">Actioned by</th>
+              <th className="sticky top-0 z-10 bg-white/80 px-3 py-3 backdrop-blur-md sm:px-5">Status</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-50">
@@ -165,7 +165,7 @@ export default function RegisterTable({
               const emp = empById[r.employeeId];
               return (
                 <tr key={r.id} className="hover:bg-slate-50/60">
-                  <td className="px-5 py-3">
+                  <td className="px-3 py-3 sm:px-5">
                     <div className="flex items-center gap-3">
                       <Avatar name={emp.name} />
                       <div>
@@ -181,20 +181,20 @@ export default function RegisterTable({
                       </div>
                     </div>
                   </td>
-                  <td className="px-5 py-3">{r.type}</td>
-                  <td className="px-5 py-3 whitespace-nowrap">
+                  <td className="hidden px-5 py-3 sm:table-cell">{r.type}</td>
+                  <td className="whitespace-nowrap px-3 py-3 sm:px-5">
                     {humanRange(r.startDate, r.endDate)}
                   </td>
-                  <td className="px-5 py-3 text-right font-medium">{r.days}</td>
-                  <td className="px-5 py-3 text-slate-500">{r.kissflowId}</td>
-                  <td className="px-5 py-3 text-slate-500">
+                  <td className="hidden px-5 py-3 text-right font-medium md:table-cell">{r.days}</td>
+                  <td className="hidden px-5 py-3 text-slate-500 lg:table-cell">{r.kissflowId}</td>
+                  <td className="hidden px-5 py-3 text-slate-500 lg:table-cell">
                     {r.status === "Rejected" && r.rejectedBy ? (
                       <span className="text-red-600">{r.rejectedBy}</span>
                     ) : (
                       r.approvedBy
                     )}
                   </td>
-                  <td className="px-5 py-3">
+                  <td className="px-3 py-3 sm:px-5">
                     <span className="inline-flex items-center">
                       <span
                         className={`rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ${statusStyles[r.status]}`}
