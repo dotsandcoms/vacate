@@ -7,6 +7,7 @@ import {
 import { computeBalances, getEmployees, getLeaveRequests } from "@/lib/data";
 import { todayIso } from "@/lib/holidays";
 import { config } from "@/lib/config";
+import { isTakenYtd, reportingFrom } from "@/lib/reporting";
 
 export const dynamic = "force-dynamic";
 
@@ -37,7 +38,7 @@ export default async function EmployeeProfilePage({
     (r) => r.status !== "Cancelled" && r.status !== "Rejected"
   );
   const daysYtd = active
-    .filter((r) => r.startDate.startsWith(today.slice(0, 4)))
+    .filter((r) => isTakenYtd(r.startDate, today))
     .reduce((s, r) => s + r.days, 0);
   const daysAllTime = active.reduce((s, r) => s + r.days, 0);
   const sickNoteGaps = active.filter(
@@ -54,7 +55,8 @@ export default async function EmployeeProfilePage({
   const ytdCostR = ytdLeaveCostR(
     history,
     employees,
-    today.slice(0, 4),
+    reportingFrom(),
+    today,
     employee.id
   );
 

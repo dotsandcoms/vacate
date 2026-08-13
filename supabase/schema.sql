@@ -18,6 +18,7 @@ create table if not exists employees (
   opening_family_balance numeric,
   opening_balance_as_of date,
   excel_name text,
+  active boolean not null default true,
   created_at timestamptz not null default now()
 );
 

@@ -4,15 +4,18 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
+  Users,
   ListChecks,
   CalendarDays,
   FileDown,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { reportingFromLabel } from "@/lib/reporting";
 import LogoMark from "./LogoMark";
 
 const nav = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/employees", label: "Employees", icon: Users },
   { href: "/register", label: "Leave Register", icon: ListChecks },
   { href: "/calendar", label: "Team Calendar", icon: CalendarDays },
   { href: "/exports", label: "Payroll Exports", icon: FileDown },
@@ -69,7 +72,7 @@ export default function Sidebar() {
             Live from Kissflow
           </div>
           <p className="mt-1.5 text-[11px] leading-relaxed text-slate-400">
-            Leave register · payroll bridge
+            Showing data from {reportingFromLabel()}
           </p>
         </div>
       </div>

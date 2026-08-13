@@ -196,6 +196,7 @@ async function loadKissflowData(): Promise<KissflowData> {
         // Placeholder entitlements until the Excel balances are imported.
         annualEntitlement: 15,
         sickEntitlement: 30,
+        active: true,
       });
     }
 

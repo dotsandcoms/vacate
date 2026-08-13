@@ -21,6 +21,9 @@ export const config = {
   /** Leave cycle: month the annual cycle starts (1 = January). */
   cycleStartMonth: 1,
 
+  /** Reporting window start (ISO). UI and YTD stats ignore leave before this. */
+  reportingFrom: "2025-01-01",
+
   /** BCEA annual accrual: 15 working days / 12 months. */
   annualAccrualPerMonth: 1.25,
 

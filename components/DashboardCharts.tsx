@@ -10,6 +10,23 @@ import {
 } from "recharts";
 import { LeaveRequest } from "@/lib/types";
 import { typeColors } from "@/lib/utils";
+import { config } from "@/lib/config";
+import { reportingWindowLabel } from "@/lib/reporting";
+
+const MONTHS = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+];
 
 function ChartTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null;
@@ -23,13 +40,37 @@ function ChartTooltip({ active, payload, label }: any) {
   );
 }
 
+function monthsThrough(fromIso: string, toIso: string) {
+  const out: { key: string; label: string }[] = [];
+  let [y, m] = fromIso.split("-").map(Number);
+  const [ty, tm] = toIso.split("-").map(Number);
+  while (y < ty || (y === ty && m <= tm)) {
+    out.push({
+      key: `${y}-${String(m).padStart(2, "0")}`,
+      label: `${MONTHS[m - 1]} ${String(y).slice(2)}`,
+    });
+    m += 1;
+    if (m > 12) {
+      m = 1;
+      y += 1;
+    }
+  }
+  return out;
+}
+
 export default function DashboardCharts({
   requests,
+  throughDate,
 }: {
   requests: LeaveRequest[];
+  throughDate: string;
 }) {
   const active = requests.filter(
-    (r) => r.status !== "Cancelled" && r.status !== "Rejected"
+    (r) =>
+      r.status !== "Cancelled" &&
+      r.status !== "Rejected" &&
+      r.startDate >= config.reportingFrom &&
+      r.startDate <= throughDate
   );
 
   const byType = Object.entries(
@@ -42,18 +83,18 @@ export default function DashboardCharts({
     .sort((a, b) => b.value - a.value);
   const typeTotal = byType.reduce((s, t) => s + t.value, 0) || 1;
 
-  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-  const byMonth = months.map((m, i) => ({
-    month: m,
+  const byMonth = monthsThrough(config.reportingFrom, throughDate).map((m) => ({
+    month: m.label,
     days: active
-      .filter((r) => new Date(r.startDate + "T00:00:00").getMonth() === i)
+      .filter((r) => r.startDate.startsWith(m.key))
       .reduce((s, r) => s + r.days, 0),
   }));
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
       <section className="panel panel-pad lg:col-span-3">
-        <h2 className="section-title mb-3">Leave days by month</h2>
+        <h2 className="section-title mb-1">Leave days by month</h2>
+        <p className="mb-3 text-xs text-slate-400">{reportingWindowLabel()}</p>
         <div className="h-52">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={byMonth} margin={{ top: 10, right: 6, left: -24, bottom: 0 }}>
@@ -61,7 +102,8 @@ export default function DashboardCharts({
                 dataKey="month"
                 tickLine={false}
                 axisLine={false}
-                fontSize={11}
+                fontSize={10}
+                interval={1}
                 tick={{ fill: "#94a3b8" }}
               />
               <YAxis
@@ -72,14 +114,15 @@ export default function DashboardCharts({
                 allowDecimals={false}
               />
               <Tooltip cursor={{ fill: "#f8fafc" }} content={<ChartTooltip />} />
-              <Bar dataKey="days" fill="#116152" radius={[4, 4, 0, 0]} maxBarSize={22} />
+              <Bar dataKey="days" fill="#116152" radius={[4, 4, 0, 0]} maxBarSize={18} />
             </BarChart>
           </ResponsiveContainer>
         </div>
       </section>
 
       <section className="panel panel-pad lg:col-span-2">
-        <h2 className="section-title mb-4">Days by leave type</h2>
+        <h2 className="section-title mb-1">Days by leave type</h2>
+        <p className="mb-3 text-xs text-slate-400">{reportingWindowLabel()}</p>
         {byType.length === 0 ? (
           <p className="text-sm text-slate-400 py-4">No leave recorded yet.</p>
         ) : (

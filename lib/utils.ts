@@ -1,7 +1,16 @@
 import { clsx, type ClassValue } from "clsx";
+import { Employee } from "./types";
 
 export function cn(...inputs: ClassValue[]) {
   return clsx(inputs);
+}
+
+export function isActiveEmployee(emp: Employee): boolean {
+  return emp.active !== false;
+}
+
+export function activeEmployees(employees: Employee[]): Employee[] {
+  return employees.filter(isActiveEmployee);
 }
 
 // Green = approved, yellow = pending/awaiting approval, red = rejected.

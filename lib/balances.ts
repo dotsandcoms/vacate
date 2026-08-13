@@ -232,13 +232,14 @@ export function leaveLiabilityR(
 }
 
 /**
- * Estimated Rand cost of leave taken YTD for one employee (or all if empId omitted).
- * Counts Approved / Pending Sync / Exported / Awaiting Approval — excludes Cancelled & Rejected.
+ * Estimated Rand cost of leave taken in a date window for one employee
+ * (or all if empId omitted). Excludes Cancelled & Rejected.
  */
 export function ytdLeaveCostR(
   requests: LeaveRequest[],
   employees: Employee[],
-  year: string,
+  fromIso: string,
+  toIso: string,
   empId?: string
 ): number {
   const byId = Object.fromEntries(employees.map((e) => [e.id, e]));
@@ -247,7 +248,8 @@ export function ytdLeaveCostR(
       (r) =>
         r.status !== "Cancelled" &&
         r.status !== "Rejected" &&
-        r.startDate.startsWith(year) &&
+        r.startDate >= fromIso &&
+        r.startDate <= toIso &&
         (empId ? r.employeeId === empId : true)
     )
     .reduce(

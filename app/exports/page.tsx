@@ -1,10 +1,16 @@
 import ExportPanel from "@/components/ExportPanel";
 import { getKissflowRegister } from "@/lib/data";
+import { reportingWindowLabel } from "@/lib/reporting";
+import { activeEmployees } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
 export default async function ExportsPage() {
-  const { employees, requests, source } = await getKissflowRegister();
+  const { employees: allEmployees, requests: allRequests, source } =
+    await getKissflowRegister();
+  const employees = activeEmployees(allEmployees);
+  const employeeIds = new Set(employees.map((e) => e.id));
+  const requests = allRequests.filter((r) => employeeIds.has(r.employeeId));
 
   return (
     <div className="space-y-6">
@@ -12,7 +18,7 @@ export default async function ExportsPage() {
         <h1 className="text-2xl font-semibold tracking-tight">Payroll Exports</h1>
         <p className="mt-1 text-sm text-slate-500">
           {source === "kissflow"
-            ? "Kissflow only — approved process items ready for payroll"
+            ? `Kissflow only · ${reportingWindowLabel()} · approved items ready for payroll`
             : "Kissflow is not connected — nothing to export"}
         </p>
       </header>

@@ -35,6 +35,8 @@ export interface Employee {
   openingBalanceAsOf?: string | null;
   /** Exact column header from the Excel register, if matched. */
   excelName?: string | null;
+  /** False once the person has left — hidden from live ops views. */
+  active?: boolean;
 }
 
 export interface LeaveRequest {

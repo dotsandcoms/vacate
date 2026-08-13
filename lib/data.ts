@@ -8,6 +8,8 @@ import {
   mergeOpeningsOntoEmployees,
   readOpeningsFile,
 } from "./openings";
+import { applyEmployeeStatus } from "./employee-status";
+import { filterReportingWindow } from "./reporting";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -63,6 +65,7 @@ function mapEmployeeRow(r: any): Employee {
         : null,
     openingBalanceAsOf: r.opening_balance_as_of ?? null,
     excelName: r.excel_name ?? null,
+    active: r.active !== false,
   };
 }
 
@@ -98,7 +101,7 @@ async function getSupabaseLeaveRequests(): Promise<LeaveRequest[]> {
 
 async function withExcelOpenings(employees: Employee[]): Promise<Employee[]> {
   const file = await readOpeningsFile();
-  return mergeOpeningsOntoEmployees(employees, file);
+  return applyEmployeeStatus(mergeOpeningsOntoEmployees(employees, file));
 }
 
 export async function getEmployees(): Promise<Employee[]> {
@@ -134,14 +137,24 @@ async function applyExportLog(requests: LeaveRequest[]): Promise<LeaveRequest[]>
   });
 }
 
-export async function getLeaveRequests(): Promise<LeaveRequest[]> {
-  if (activeSource === "mock") return applyExportLog(mockRequests);
-  if (activeSource === "supabase") {
-    return applyExportLog(await getSupabaseLeaveRequests());
+export async function getLeaveRequests(opts?: {
+  allDates?: boolean;
+}): Promise<LeaveRequest[]> {
+  let requests: LeaveRequest[];
+  if (activeSource === "mock") {
+    requests = await applyExportLog(mockRequests);
+  } else if (activeSource === "supabase") {
+    requests = await applyExportLog(await getSupabaseLeaveRequests());
+  } else if (activeSource === "kissflow") {
+    const { requests: kfRequests } = await getKissflowData();
+    requests = await applyExportLog(kfRequests);
+  } else {
+    // "both": handled below
+    requests = [];
   }
-  if (activeSource === "kissflow") {
-    const { requests } = await getKissflowData();
-    return applyExportLog(requests);
+
+  if (activeSource === "mock" || activeSource === "supabase" || activeSource === "kissflow") {
+    return opts?.allDates ? requests : filterReportingWindow(requests);
   }
 
   // "both": Supabase requests are authoritative. Any live Kissflow request
@@ -166,7 +179,8 @@ export async function getLeaveRequests(): Promise<LeaveRequest[]> {
       const resolvedId = kfEmp ? idByEmployeeNo.get(kfEmp.employeeNo) : undefined;
       return resolvedId ? { ...r, employeeId: resolvedId } : r;
     });
-  return applyExportLog([...sbRequests, ...extra]);
+  const merged = await applyExportLog([...sbRequests, ...extra]);
+  return opts?.allDates ? merged : filterReportingWindow(merged);
 }
 
 /**
@@ -183,8 +197,8 @@ export async function getKissflowRegister(): Promise<{
   }
   const { employees, requests } = await getKissflowData();
   return {
-    employees,
-    requests: await applyExportLog(requests),
+    employees: await applyEmployeeStatus(employees),
+    requests: filterReportingWindow(await applyExportLog(requests)),
     source: "kissflow",
   };
 }

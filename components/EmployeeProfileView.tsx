@@ -8,8 +8,9 @@ import {
 } from "lucide-react";
 import Avatar from "@/components/Avatar";
 import { formatRand } from "@/lib/balances";
-import { statusStyles, typeColors } from "@/lib/utils";
+import { isActiveEmployee, statusStyles, typeColors } from "@/lib/utils";
 import { humanDate, humanRange } from "@/lib/holidays";
+import { reportingFromLabel, reportingWindowLabel } from "@/lib/reporting";
 import { Employee, LeaveBalance, LeaveRequest } from "@/lib/types";
 
 type Props = {
@@ -49,11 +50,11 @@ export default function EmployeeProfileView({
   return (
     <div className="space-y-6">
       <Link
-        href="/"
+        href="/employees"
         className="inline-flex items-center gap-1 text-sm text-slate-500 transition hover:text-slate-800"
       >
         <ChevronLeft className="h-4 w-4" />
-        Back to dashboard
+        Back to employees
       </Link>
 
       {/* Hero */}
@@ -69,6 +70,11 @@ export default function EmployeeProfileView({
               <p className="mt-1.5 text-sm text-slate-500">
                 {employee.department} · {employee.role}
               </p>
+              {!isActiveEmployee(employee) && (
+                <p className="mt-3 inline-flex rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600 ring-1 ring-slate-400/30">
+                  Inactive · left the company
+                </p>
+              )}
               {onLeaveNow && (
                 <p className="mt-3 inline-flex rounded-full bg-brand-50 px-3 py-1 text-xs font-semibold text-brand-800 ring-1 ring-brand-600/20">
                   On {onLeaveNow.type.toLowerCase()} ·{" "}
@@ -180,12 +186,12 @@ export default function EmployeeProfileView({
             icon: <ClipboardList className="h-4 w-4" />,
           },
           {
-            label: "Days YTD",
+            label: `Days ${reportingWindowLabel()}`,
             value: daysYtd,
             icon: <CalendarDays className="h-4 w-4" />,
           },
           {
-            label: "Days all-time",
+            label: `Since ${reportingFromLabel()}`,
             value: daysAllTime,
             icon: <FileText className="h-4 w-4" />,
           },

@@ -30,7 +30,7 @@ async function main() {
     "Busisiwe Mary Sithole": 7.5,
   };
   const emps = await getEmployees();
-  const reqs = await getLeaveRequests();
+  const reqs = await getLeaveRequests({ allDates: true });
   const bals = computeBalances(emps, reqs);
   const withOpen = emps.filter((e) => e.openingAnnualBalance != null).length;
   console.log(

@@ -19,7 +19,7 @@ import {
   payrollQueueCostR,
   ytdLeaveCostR,
 } from "@/lib/balances";
-import { statusStyles } from "@/lib/utils";
+import { activeEmployees, statusStyles } from "@/lib/utils";
 import { config } from "@/lib/config";
 import {
   addDaysIso,
@@ -28,6 +28,11 @@ import {
   isWorkingDay,
   todayIso,
 } from "@/lib/holidays";
+import {
+  isTakenYtd,
+  reportingFrom,
+  reportingWindowLabel,
+} from "@/lib/reporting";
 
 export const dynamic = "force-dynamic";
 
@@ -36,10 +41,11 @@ export default async function DashboardPage({
 }: {
   searchParams?: { department?: string };
 }) {
-  const [allEmployees, allRequests] = await Promise.all([
+  const [allStaff, allRequests] = await Promise.all([
     getEmployees(),
     getLeaveRequests(),
   ]);
+  const allEmployees = activeEmployees(allStaff);
 
   const departments = Array.from(
     new Set(allEmployees.map((e) => e.department).filter(Boolean))
@@ -53,9 +59,7 @@ export default async function DashboardPage({
     ? allEmployees.filter((e) => e.department === department)
     : allEmployees;
   const employeeIds = new Set(employees.map((e) => e.id));
-  const requests = department
-    ? allRequests.filter((r) => employeeIds.has(r.employeeId))
-    : allRequests;
+  const requests = allRequests.filter((r) => employeeIds.has(r.employeeId));
 
   const balances = computeBalances(employees, requests);
   const empById = Object.fromEntries(employees.map((e) => [e.id, e]));
@@ -77,7 +81,7 @@ export default async function DashboardPage({
   );
   const pendingSync = requests.filter((r) => r.status === "Approved");
   const daysYtd = active
-    .filter((r) => r.startDate.startsWith(today.slice(0, 4)))
+    .filter((r) => isTakenYtd(r.startDate, today))
     .reduce((s, r) => s + r.days, 0);
   const leaveDaysLogged = requests.reduce((s, r) => s + r.days, 0);
 
@@ -153,9 +157,8 @@ export default async function DashboardPage({
   ];
 
   const isLive = activeSource !== "mock";
-  const year = today.slice(0, 4);
   const accruedLiability = leaveLiabilityR(employees, balances);
-  const ytdCost = ytdLeaveCostR(requests, employees, year);
+  const ytdCost = ytdLeaveCostR(requests, employees, reportingFrom(), today);
   const payrollCost = payrollQueueCostR(pendingSync, employees);
   const topLiability = employees
     .map((emp) => {
@@ -189,7 +192,8 @@ export default async function DashboardPage({
                 {" · "}
               </>
             ) : null}
-            {employees.length} staff · {leaveDaysLogged} leave days on record
+            {employees.length} staff · {leaveDaysLogged} leave days ·{" "}
+            {reportingWindowLabel()}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
@@ -277,7 +281,7 @@ export default async function DashboardPage({
             <div className="stat-label">YTD leave cost</div>
             <div className="stat-value mt-1">{formatRand(ytdCost)}</div>
             <p className="mt-1 text-xs text-slate-400">
-              {daysYtd} leave days taken in {year}
+              {daysYtd} leave days · {reportingWindowLabel()}
             </p>
           </div>
           <Link
@@ -385,7 +389,7 @@ export default async function DashboardPage({
             threshold={config.clashThreshold}
           />
 
-          <DashboardCharts requests={requests} />
+          <DashboardCharts requests={requests} throughDate={today} />
         </div>
 
         <div className="space-y-4">
