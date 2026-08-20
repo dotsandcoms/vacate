@@ -8,22 +8,26 @@ import { computeBalances, getEmployees, getLeaveRequests } from "@/lib/data";
 import { todayIso } from "@/lib/holidays";
 import { config } from "@/lib/config";
 import { isTakenYtd, reportingFrom } from "@/lib/reporting";
+import { requireUser, scopeRequests } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
 export default async function EmployeeProfilePage({
   params,
 }: {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }) {
-  const [employees, requests] = await Promise.all([
+  const user = await requireUser();
+  const { id } = await params;
+  const [allEmployees, allRequests] = await Promise.all([
     getEmployees(),
     getLeaveRequests(),
   ]);
+  const { employees, requests } = scopeRequests(user, allEmployees, allRequests);
 
   const employee =
-    employees.find((e) => e.id === params.id) ??
-    employees.find((e) => e.employeeNo === params.id);
+    employees.find((e) => e.id === id) ??
+    employees.find((e) => e.employeeNo === id);
   if (!employee) notFound();
 
   const balances = computeBalances(employees, requests).filter(

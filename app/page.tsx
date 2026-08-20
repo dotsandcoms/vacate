@@ -33,25 +33,30 @@ import {
   reportingFrom,
   reportingWindowLabel,
 } from "@/lib/reporting";
+import { requireUser, scopeRequests } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams?: { department?: string };
+  searchParams?: Promise<{ department?: string }>;
 }) {
+  const user = await requireUser();
+  const resolvedSearchParams = searchParams ? await searchParams : undefined;
   const [allStaff, allRequests] = await Promise.all([
     getEmployees(),
     getLeaveRequests(),
   ]);
-  const allEmployees = activeEmployees(allStaff);
+  const scoped = scopeRequests(user, activeEmployees(allStaff), allRequests);
+  const allEmployees = scoped.employees;
+  const scopedRequests = scoped.requests;
 
   const departments = Array.from(
     new Set(allEmployees.map((e) => e.department).filter(Boolean))
   ).sort((a, b) => a.localeCompare(b));
 
-  const selectedDept = searchParams?.department?.trim() || null;
+  const selectedDept = resolvedSearchParams?.department?.trim() || null;
   const department =
     selectedDept && departments.includes(selectedDept) ? selectedDept : null;
 
@@ -59,7 +64,7 @@ export default async function DashboardPage({
     ? allEmployees.filter((e) => e.department === department)
     : allEmployees;
   const employeeIds = new Set(employees.map((e) => e.id));
-  const requests = allRequests.filter((r) => employeeIds.has(r.employeeId));
+  const requests = scopedRequests.filter((r) => employeeIds.has(r.employeeId));
 
   const balances = computeBalances(employees, requests);
   const empById = Object.fromEntries(employees.map((e) => [e.id, e]));
@@ -95,6 +100,9 @@ export default async function DashboardPage({
     }))
     .filter((r) => r.waitingDays >= config.approvalAgingDays)
     .sort((a, b) => b.waitingDays - a.waitingDays);
+  const stuckVisibleLimit = 6;
+  const visibleStuck = stuck.slice(0, stuckVisibleLimit);
+  const hiddenStuckCount = stuck.length - visibleStuck.length;
 
   const clashes: {
     date: string;
@@ -223,7 +231,7 @@ export default async function DashboardPage({
               />
             </span>
             {activeSource === "both"
-              ? "Supabase history + Kissflow test sync"
+              ? "Supabase history + Kissflow live sync"
               : activeSource === "supabase"
               ? "Supabase (history + Kissflow sync)"
               : activeSource === "kissflow"
@@ -231,7 +239,7 @@ export default async function DashboardPage({
               : "Sample data — Supabase not connected"}
           </span>
           <EmployeeSearch employees={allEmployees} />
-          <NotificationBell />
+          {(user.role === "admin" || user.role === "cfo") && <NotificationBell />}
         </div>
       </header>
 
@@ -401,7 +409,7 @@ export default async function DashboardPage({
               </p>
             ) : (
               <ul className="divide-y divide-slate-100">
-                {stuck.map((r) => (
+                {visibleStuck.map((r) => (
                   <li key={r.id} className="flex items-start gap-3 py-2.5">
                     <Avatar name={empById[r.employeeId]?.name} />
                     <div className="min-w-0">
@@ -425,6 +433,17 @@ export default async function DashboardPage({
                   </li>
                 ))}
               </ul>
+            )}
+            {hiddenStuckCount > 0 && (
+              <p className="mt-3 border-t border-slate-100 pt-3 text-xs text-slate-500">
+                Showing {stuckVisibleLimit} of {stuck.length}.{" "}
+                <Link
+                  href="/register"
+                  className="font-medium text-brand-600 hover:underline"
+                >
+                  Open leave register ({hiddenStuckCount} more)
+                </Link>
+              </p>
             )}
           </section>
 

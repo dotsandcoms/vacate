@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import { timingSafeEqual } from "node:crypto";
 
 /**
  * Kissflow → Vacate webhook.
@@ -23,13 +24,32 @@ import { createClient } from "@supabase/supabase-js";
  */
 export async function POST(req: NextRequest) {
   const secret = process.env.KISSFLOW_WEBHOOK_SECRET;
-  if (secret && req.headers.get("x-webhook-secret") !== secret) {
+  if (!secret || secret === "change-me") {
+    console.error("[vacate] Kissflow webhook secret is not configured securely");
+    return NextResponse.json({ error: "Webhook unavailable" }, { status: 503 });
+  }
+  const supplied = req.headers.get("x-webhook-secret") ?? "";
+  const expectedBuffer = Buffer.from(secret);
+  const suppliedBuffer = Buffer.from(supplied);
+  if (
+    expectedBuffer.length !== suppliedBuffer.length ||
+    !timingSafeEqual(expectedBuffer, suppliedBuffer)
+  ) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const contentLength = Number(req.headers.get("content-length") ?? 0);
+  if (contentLength > 262_144) {
+    return NextResponse.json({ error: "Payload too large" }, { status: 413 });
   }
 
   let payload: any;
   try {
-    payload = await req.json();
+    const rawBody = await req.text();
+    if (Buffer.byteLength(rawBody, "utf8") > 262_144) {
+      return NextResponse.json({ error: "Payload too large" }, { status: 413 });
+    }
+    payload = JSON.parse(rawBody);
   } catch {
     return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }

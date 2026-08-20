@@ -15,6 +15,7 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
 const usingSupabase = Boolean(supabaseUrl && supabaseKey);
+const kissflowOnly = process.env.KISSFLOW_ONLY === "true";
 
 // Supabase holds the historical register plus anything the Kissflow webhook
 // has already written. The live Kissflow poll is merged on top of it — not
@@ -23,7 +24,9 @@ const usingSupabase = Boolean(supabaseUrl && supabaseKey);
 // exists. Overlap between the two is de-duplicated by Kissflow request ID.
 export { usingKissflow };
 export const activeSource: "both" | "supabase" | "kissflow" | "mock" =
-  usingSupabase && usingKissflow
+  usingKissflow && kissflowOnly
+    ? "kissflow"
+    : usingSupabase && usingKissflow
     ? "both"
     : usingSupabase
     ? "supabase"

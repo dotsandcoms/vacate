@@ -1,10 +1,12 @@
 import EmployeeDirectory from "@/components/EmployeeDirectory";
 import { getEmployees } from "@/lib/data";
+import { requireUser, scopeEmployees } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
 export default async function EmployeesPage() {
-  const employees = await getEmployees();
+  const user = await requireUser();
+  const employees = scopeEmployees(user, await getEmployees());
 
   return (
     <div className="space-y-6">

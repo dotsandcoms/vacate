@@ -4,6 +4,7 @@
 // on the server.
 import { Employee, LeaveRequest, LeaveStatus, LeaveType } from "./types";
 import { workingDays } from "./holidays";
+import { unstable_cache } from "next/cache";
 
 const subdomain = process.env.KISSFLOW_SUBDOMAIN; // e.g. "utf"
 const accountId = process.env.KISSFLOW_ACCOUNT_ID; // e.g. "Ac4onwiPboXl"
@@ -15,15 +16,59 @@ export const usingKissflow = Boolean(
   subdomain && accountId && processId && keyId && keySecret
 );
 
-const PAGE_SIZE = 50;
+// The API accepts arbitrary page sizes. This process currently has ~2,500
+// items, so one 5,000-row response avoids an expensive pagination waterfall.
+// fetchAllItems still handles additional pages if the process outgrows it.
+const PAGE_SIZE = 5_000;
+
+// Known Kissflow data-entry corrections. Keep the historical request intact
+// while joining it to the employee's canonical number in the dashboard.
+const EMPLOYEE_NUMBER_ALIASES: Record<string, string> = {
+  "2050": "250",
+};
+
+// Request form and workflow fields together. Kissflow's column-selection POST
+// returns both, avoiding a second full paginated sweep for system metadata.
+const ITEM_COLUMNS = [
+  "_id",
+  "_status",
+  "_note",
+  "_submitted_at",
+  "_completed_at",
+  "_modified_by",
+  "_modified_at",
+  "_created_at",
+  "_created_by",
+  "_progress",
+  "_current_context",
+  "_current_assigned_to",
+  "Staff_Name",
+  "Staff_Name_1",
+  "Staff_Nam",
+  "Employee_Number",
+  "First_Day_of_Leave",
+  "Last_Day_of_Leave",
+  "Leave_Type",
+  "Type_of_Leave",
+  "LeaveType",
+  "Leave_type",
+  "Who_will_stand_in_for_you_whilst",
+  "who_will_stand_in_for_you_whilst_on_leave",
+  "Form_Attachment",
+  "attachment_1",
+  "Attachment_IDPassport_copy",
+].map((Id) => ({ Id }));
 
 async function fetchItemsPage(page: number): Promise<any> {
   const url = `https://${subdomain}.kissflow.com/process/2/${accountId}/admin/${processId}/item?page_number=${page}&page_size=${PAGE_SIZE}`;
   const res = await fetch(url, {
+    method: "POST",
     headers: {
       "X-Access-Key-Id": keyId!,
       "X-Access-Key-Secret": keySecret!,
+      "Content-Type": "application/json",
     },
+    body: JSON.stringify({ Columns: ITEM_COLUMNS }),
     // Always fetch fresh — the dashboard is meant to be live.
     cache: "no-store",
   });
@@ -36,11 +81,29 @@ async function fetchItemsPage(page: number): Promise<any> {
 
 async function fetchAllItems(): Promise<any[]> {
   const items: any[] = [];
-  for (let page = 1; page <= 40; page++) {
-    const data = await fetchItemsPage(page);
-    const rows: any[] = data?.Data ?? [];
-    items.push(...rows);
-    if (rows.length < PAGE_SIZE) break;
+  const firstData = await fetchItemsPage(1);
+  const firstRows: any[] = firstData?.Data ?? [];
+  items.push(...firstRows);
+  if (firstRows.length < PAGE_SIZE) return items;
+
+  // Kissflow does not expose a reliable total here. Fetch subsequent pages in
+  // modest parallel batches to avoid a long sequential waterfall without
+  // creating an aggressive burst against the API.
+  const concurrency = 4;
+  for (let start = 2; start <= 40; start += concurrency) {
+    const pageNumbers = Array.from(
+      { length: Math.min(concurrency, 41 - start) },
+      (_, index) => start + index
+    );
+    const pages = await Promise.all(pageNumbers.map(fetchItemsPage));
+    let reachedEnd = false;
+    for (const data of pages) {
+      if (reachedEnd) break;
+      const rows: any[] = data?.Data ?? [];
+      items.push(...rows);
+      reachedEnd = rows.length < PAGE_SIZE;
+    }
+    if (reachedEnd) break;
   }
   return items;
 }
@@ -50,43 +113,6 @@ interface NoteEntry {
   Type?: string; // "reject", etc.
   NotifiedAt?: string;
   NotifiedBy?: { Name?: string };
-}
-
-/** System fields like the rejection note aren't in the default item list —
- *  they must be requested explicitly via a POST column selection. */
-async function fetchSystemFields(): Promise<Map<string, any>> {
-  const map = new Map<string, any>();
-  const body = JSON.stringify({
-    Columns: [
-      { Id: "_id" },
-      { Id: "_status" },
-      { Id: "_note" },
-      { Id: "_submitted_at" },
-      { Id: "_completed_at" },
-      { Id: "_modified_by" },
-      { Id: "_progress" },
-      { Id: "_current_context" },
-    ],
-  });
-  for (let page = 1; page <= 40; page++) {
-    const url = `https://${subdomain}.kissflow.com/process/2/${accountId}/admin/${processId}/item?page_number=${page}&page_size=${PAGE_SIZE}`;
-    const res = await fetch(url, {
-      method: "POST",
-      headers: {
-        "X-Access-Key-Id": keyId!,
-        "X-Access-Key-Secret": keySecret!,
-        "Content-Type": "application/json",
-      },
-      body,
-      cache: "no-store",
-    });
-    if (!res.ok) break; // non-fatal: we just won't have notes
-    const data = await res.json();
-    const rows: any[] = data?.Data ?? [];
-    for (const row of rows) map.set(row._id, row);
-    if (rows.length < PAGE_SIZE) break;
-  }
-  return map;
 }
 
 function rejectionFromNotes(notes: NoteEntry[] | undefined) {
@@ -158,38 +184,54 @@ export interface KissflowData {
   requests: LeaveRequest[];
 }
 
-// Small in-memory cache so dashboard + register don't double-hit the API
-// within the same few seconds.
+// L1 cache de-duplicates calls inside one server process. The Next data cache
+// below is shared across requests/instances so a profile navigation does not
+// trigger another full Kissflow scan on a different worker.
 let cache: { at: number; promise: Promise<KissflowData> } | null = null;
-const CACHE_MS = 15_000;
+const CACHE_MS = 60_000;
+
+const getPersistedKissflowData = unstable_cache(
+  loadKissflowData,
+  [
+    "kissflow-process-data-v2-single-page",
+    subdomain ?? "",
+    accountId ?? "",
+    processId ?? "",
+  ],
+  { revalidate: 60, tags: [`kissflow-process-${processId ?? "unknown"}`] }
+);
 
 export function getKissflowData(): Promise<KissflowData> {
   if (cache && Date.now() - cache.at < CACHE_MS) return cache.promise;
-  const promise = loadKissflowData();
+  const promise = getPersistedKissflowData();
   cache = { at: Date.now(), promise };
   promise.catch(() => (cache = null)); // don't cache failures
   return promise;
 }
 
 async function loadKissflowData(): Promise<KissflowData> {
-  const [items, systemFields] = await Promise.all([
-    fetchAllItems(),
-    fetchSystemFields(),
-  ]);
+  const items = await fetchAllItems();
 
   const employeesById = new Map<string, Employee>();
   const requests: LeaveRequest[] = [];
 
   for (const item of items) {
+    // Historical records without an employee number cannot be joined to a
+    // canonical staff member reliably. Hide them until a cleanup/mapping
+    // policy is agreed instead of creating duplicate creator-based identities.
+    if (item.Employee_Number == null || String(item.Employee_Number).trim() === "") {
+      continue;
+    }
+
     const name = employeeName(item);
-    const empNo =
-      item.Employee_Number != null ? String(item.Employee_Number) : "";
-    const empId = empNo || item._created_by?._id || name;
+    const rawEmpNo = String(item.Employee_Number).trim();
+    const empNo = EMPLOYEE_NUMBER_ALIASES[rawEmpNo] ?? rawEmpNo;
+    const empId = empNo;
 
     if (!employeesById.has(empId)) {
       employeesById.set(empId, {
         id: empId,
-        employeeNo: empNo || "—",
+        employeeNo: empNo,
         name,
         department: "—", // not on the Kissflow form (yet)
         role: "—",
@@ -205,11 +247,12 @@ async function loadKissflowData(): Promise<KissflowData> {
     if (!startDate) continue; // skip drafts with no dates yet
 
     const hasAttachment =
+      (Array.isArray(item.Form_Attachment) && item.Form_Attachment.length > 0) ||
       (Array.isArray(item.attachment_1) && item.attachment_1.length > 0) ||
       (Array.isArray(item.Attachment_IDPassport_copy) &&
         item.Attachment_IDPassport_copy.length > 0);
 
-    const sys = systemFields.get(item._id);
+    const sys = item;
     const rejection = rejectionFromNotes(sys?._note);
 
     // Multi-step aware: all current assignees (parallel approvers), and the
@@ -238,7 +281,9 @@ async function loadKissflowData(): Promise<KissflowData> {
         item._modified_at ??
         item._created_at ??
         "",
-      notes: item.who_will_stand_in_for_you_whilst_on_leave
+      notes: item.Who_will_stand_in_for_you_whilst?.Name
+        ? `Stand-in: ${item.Who_will_stand_in_for_you_whilst.Name}`
+        : item.who_will_stand_in_for_you_whilst_on_leave
         ? `Stand-in: ${item.who_will_stand_in_for_you_whilst_on_leave}`
         : undefined,
       exportedAt: null,

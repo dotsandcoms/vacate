@@ -2,15 +2,19 @@ import TeamCalendar from "@/components/TeamCalendar";
 import { getEmployees, getLeaveRequests } from "@/lib/data";
 import { reportingWindowLabel } from "@/lib/reporting";
 import { activeEmployees } from "@/lib/utils";
+import { requireUser, scopeRequests } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
 export default async function CalendarPage() {
-  const [allEmployees, requests] = await Promise.all([
+  const user = await requireUser();
+  const [allEmployees, allRequests] = await Promise.all([
     getEmployees(),
     getLeaveRequests(),
   ]);
-  const employees = activeEmployees(allEmployees);
+  const scoped = scopeRequests(user, activeEmployees(allEmployees), allRequests);
+  const employees = scoped.employees;
+  const requests = scoped.requests;
   const activeIds = new Set(employees.map((e) => e.id));
   const activeRequests = requests.filter((r) => activeIds.has(r.employeeId));
   return (

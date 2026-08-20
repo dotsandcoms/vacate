@@ -2,15 +2,17 @@ import RegisterTable from "@/components/RegisterTable";
 import { getKissflowRegister } from "@/lib/data";
 import { reportingWindowLabel } from "@/lib/reporting";
 import { activeEmployees } from "@/lib/utils";
+import { requireUser, scopeRequests } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
 export default async function RegisterPage() {
+  const user = await requireUser();
   const { employees: allEmployees, requests: allRequests, source } =
     await getKissflowRegister();
-  const employees = activeEmployees(allEmployees);
-  const employeeIds = new Set(employees.map((e) => e.id));
-  const requests = allRequests.filter((r) => employeeIds.has(r.employeeId));
+  const scoped = scopeRequests(user, activeEmployees(allEmployees), allRequests);
+  const employees = scoped.employees;
+  const requests = scoped.requests;
 
   return (
     <div className="space-y-6">

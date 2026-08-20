@@ -2,10 +2,12 @@ import ExportPanel from "@/components/ExportPanel";
 import { getKissflowRegister } from "@/lib/data";
 import { reportingWindowLabel } from "@/lib/reporting";
 import { activeEmployees } from "@/lib/utils";
+import { requireUser } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
 export default async function ExportsPage() {
+  await requireUser(["admin", "cfo"]);
   const { employees: allEmployees, requests: allRequests, source } =
     await getKissflowRegister();
   const employees = activeEmployees(allEmployees);

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { setEmployeeActive } from "@/lib/employee-status";
+import { authorizeApi, rejectCrossOrigin } from "@/lib/security";
 
 export const dynamic = "force-dynamic";
 
@@ -11,6 +12,10 @@ function isUuid(id: string): boolean {
 }
 
 export async function PATCH(req: NextRequest) {
+  const auth = await authorizeApi(["admin"]);
+  if (auth.response) return auth.response;
+  const originError = rejectCrossOrigin(req);
+  if (originError) return originError;
   try {
     const { id, employeeNo, active } = await req.json();
     if (!id || typeof active !== "boolean") {

@@ -3,7 +3,14 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Download, FileSpreadsheet, Lock, Search } from "lucide-react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  Download,
+  FileSpreadsheet,
+  Lock,
+  Search,
+} from "lucide-react";
 import { Employee, LeaveRequest } from "@/lib/types";
 import { humanRange } from "@/lib/holidays";
 import Avatar from "./Avatar";
@@ -17,6 +24,8 @@ interface Batch {
   employeeCount: number;
 }
 
+const PAGE_SIZE = 25;
+
 export default function ExportPanel({
   employees,
   requests,
@@ -29,6 +38,7 @@ export default function ExportPanel({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [q, setQ] = useState("");
+  const [page, setPage] = useState(1);
 
   const empById = useMemo(
     () => Object.fromEntries(employees.map((e) => [e.id, e])),
@@ -51,6 +61,22 @@ export default function ExportPanel({
         .includes(needle);
     });
   }, [pending, empById, q]);
+
+  const totalPages = Math.max(1, Math.ceil(visiblePending.length / PAGE_SIZE));
+  const paginatedPending = useMemo(
+    () => visiblePending.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
+    [visiblePending, page]
+  );
+  const firstVisible = visiblePending.length === 0 ? 0 : (page - 1) * PAGE_SIZE + 1;
+  const lastVisible = Math.min(page * PAGE_SIZE, visiblePending.length);
+
+  useEffect(() => {
+    setPage(1);
+  }, [q]);
+
+  useEffect(() => {
+    setPage((current) => Math.min(current, totalPages));
+  }, [totalPages]);
 
   const loadBatches = () =>
     fetch("/api/exports")
@@ -170,7 +196,7 @@ export default function ExportPanel({
             />
           </div>
           <span className="text-xs text-slate-400">
-            {visiblePending.length} of {pending.length} shown · export always
+            {visiblePending.length} of {pending.length} match · export always
             includes the full batch
           </span>
         </div>
@@ -189,7 +215,7 @@ export default function ExportPanel({
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-50">
-            {visiblePending.map((r) => {
+            {paginatedPending.map((r) => {
               const e = empById[r.employeeId];
               return (
                 <tr key={r.id} className="hover:bg-slate-50/60">
@@ -231,6 +257,40 @@ export default function ExportPanel({
             )}
           </tbody>
         </table>
+        {visiblePending.length > PAGE_SIZE && (
+          <div className="flex min-w-full items-center justify-between gap-3 border-t border-slate-100 bg-white/35 px-4 py-3">
+            <p className="text-xs tabular-nums text-slate-500">
+              Showing {firstVisible}–{lastVisible} of {visiblePending.length}
+            </p>
+            <div className="flex items-center gap-2" aria-label="Payroll requests pagination">
+              <button
+                type="button"
+                onClick={() => setPage((current) => Math.max(1, current - 1))}
+                disabled={page === 1}
+                className="inline-flex min-h-9 items-center gap-1 rounded-lg bg-white/75 px-3 text-xs font-medium text-slate-600 shadow-sm ring-1 ring-inset ring-slate-200 transition-[scale,background-color,color] duration-150 ease-out hover:bg-white hover:text-ink-900 active:scale-[0.96] disabled:cursor-not-allowed disabled:opacity-40 disabled:active:scale-100"
+                aria-label="Previous page"
+              >
+                <ChevronLeft className="h-3.5 w-3.5" strokeWidth={2} />
+                Previous
+              </button>
+              <span className="min-w-16 text-center text-xs font-medium tabular-nums text-slate-500">
+                {page} / {totalPages}
+              </span>
+              <button
+                type="button"
+                onClick={() =>
+                  setPage((current) => Math.min(totalPages, current + 1))
+                }
+                disabled={page === totalPages}
+                className="inline-flex min-h-9 items-center gap-1 rounded-lg bg-white/75 px-3 text-xs font-medium text-slate-600 shadow-sm ring-1 ring-inset ring-slate-200 transition-[scale,background-color,color] duration-150 ease-out hover:bg-white hover:text-ink-900 active:scale-[0.96] disabled:cursor-not-allowed disabled:opacity-40 disabled:active:scale-100"
+                aria-label="Next page"
+              >
+                Next
+                <ChevronRight className="h-3.5 w-3.5" strokeWidth={2} />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       <section>
