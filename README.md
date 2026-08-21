@@ -22,21 +22,34 @@ Opens at http://localhost:3000 — runs on **built-in mock data** until Supabase
 
 ## Wiring up production
 1. Create a Supabase project, run `supabase/schema.sql` in the SQL editor.
-2. Copy `.env.example` → `.env.local` and fill in the keys.
-3. Import staff into the `employees` table (from the current Excel).
-4. In Kissflow, add a **webhook on the final approval step** posting to
+2. Run `supabase/migrations/002_app_users_auth.sql` to create role-based access profiles.
+3. Copy `.env.example` → `.env.local`, fill in the keys, and set
+   `BOOTSTRAP_ADMIN_EMAILS` to the first trusted administrator's email.
+4. In Supabase Auth, configure the application URL and `/auth/callback` as an
+   allowed redirect URL. The dashboard supports password and passwordless email sign-in.
+5. Import staff into the `employees` table (from the current Excel).
+6. In Kissflow, add a **webhook on the final approval step** posting to
    `https://<app>.vercel.app/api/webhooks/kissflow` with header
    `X-Webhook-Secret`. Payload mapping is documented in
    `app/api/webhooks/kissflow/route.ts`. The upsert is idempotent on the
    Kissflow request ID, so retries never duplicate.
-5. Payroll: once the system is confirmed, either
+7. Payroll: once the system is confirmed, either
    - **API push** (SimplePay / PaySpace / Sage have REST APIs) via a Vercel
      cron job per pay run, or
    - **exact-format import file** generated automatically and delivered by
      email/SFTP.
 
+## Access control
+
+- **Administrator** — full access and user administration.
+- **CFO / Finance** — full operational and payroll access.
+- **Department manager** — read-only data scoped to the assigned department;
+  no payroll or user administration access.
+
+All pages and APIs validate the Supabase session on the server. Administrators
+can invite, assign and revoke users from **User Access** in the dashboard.
+
 ## Still to come
-- Auth (Supabase Auth, manager-scoped row-level security)
 - Payroll-specific export format (waiting on payroll system confirmation)
 
 ## Excel baseline → Kissflow live

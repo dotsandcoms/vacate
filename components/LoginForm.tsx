@@ -1,11 +1,16 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { ArrowRight, CheckCircle2, Mail, ShieldCheck } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ArrowRight, CheckCircle2, Eye, EyeOff, LockKeyhole, Mail, ShieldCheck } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
 export default function LoginForm({ nextPath = "/" }: { nextPath?: string }) {
+  const router = useRouter();
   const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [method, setMethod] = useState<"password" | "magic-link">("password");
+  const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -16,6 +21,17 @@ export default function LoginForm({ nextPath = "/" }: { nextPath?: string }) {
     setError(null);
     try {
       const supabase = createClient();
+      if (method === "password") {
+        const { error: authError } = await supabase.auth.signInWithPassword({
+          email: email.trim().toLowerCase(),
+          password,
+        });
+        if (authError) throw authError;
+        const destination = nextPath.startsWith("/") && !nextPath.startsWith("//") ? nextPath : "/";
+        router.replace(destination);
+        router.refresh();
+        return;
+      }
       const callback = new URL("/auth/callback", window.location.origin);
       callback.searchParams.set("next", nextPath.startsWith("/") ? nextPath : "/");
       const { error: authError } = await supabase.auth.signInWithOtp({
@@ -25,8 +41,12 @@ export default function LoginForm({ nextPath = "/" }: { nextPath?: string }) {
       if (authError) throw authError;
       setSent(true);
     } catch {
-      // Do not disclose whether an email exists in the access list.
-      setSent(true);
+      if (method === "magic-link") {
+        // Do not disclose whether an email exists in the access list.
+        setSent(true);
+      } else {
+        setError("The email address or password is incorrect.");
+      }
     } finally {
       setBusy(false);
     }
@@ -43,6 +63,11 @@ export default function LoginForm({ nextPath = "/" }: { nextPath?: string }) {
         Sign in to your live leave management workspace.
       </p>
 
+      <div className="mt-7 grid grid-cols-2 rounded-xl bg-slate-100 p-1" aria-label="Sign-in method">
+        <button type="button" onClick={() => { setMethod("password"); setSent(false); setError(null); }} className={`rounded-lg px-3 py-2 text-sm font-medium transition-[background-color,color,box-shadow] ${method === "password" ? "bg-white text-ink-900 shadow-sm" : "text-slate-500 hover:text-ink-900"}`} aria-pressed={method === "password"}>Password</button>
+        <button type="button" onClick={() => { setMethod("magic-link"); setError(null); }} className={`rounded-lg px-3 py-2 text-sm font-medium transition-[background-color,color,box-shadow] ${method === "magic-link" ? "bg-white text-ink-900 shadow-sm" : "text-slate-500 hover:text-ink-900"}`} aria-pressed={method === "magic-link"}>Email link</button>
+      </div>
+
       {sent ? (
         <div className="mt-8 rounded-2xl bg-emerald-50 p-5 text-sm text-emerald-900 ring-1 ring-inset ring-emerald-200" role="status">
           <CheckCircle2 className="mb-3 h-5 w-5 text-emerald-600" aria-hidden="true" />
@@ -51,7 +76,7 @@ export default function LoginForm({ nextPath = "/" }: { nextPath?: string }) {
         </div>
       ) : (
         <>
-          <label htmlFor="email" className="mt-8 block text-sm font-medium text-ink-900">
+          <label htmlFor="email" className="mt-6 block text-sm font-medium text-ink-900">
             Work email address
           </label>
           <div className="relative mt-2">
@@ -68,9 +93,21 @@ export default function LoginForm({ nextPath = "/" }: { nextPath?: string }) {
               placeholder="name@urbantaskforce.co.za"
             />
           </div>
+          {method === "password" && (
+            <>
+              <label htmlFor="password" className="mt-4 block text-sm font-medium text-ink-900">Password</label>
+              <div className="relative mt-2">
+                <LockKeyhole className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden="true" />
+                <input id="password" name="password" type={showPassword ? "text" : "password"} autoComplete="current-password" required value={password} onChange={(event) => setPassword(event.target.value)} className="input-base py-3.5 pl-10 pr-11" />
+                <button type="button" onClick={() => setShowPassword((visible) => !visible)} className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-600" aria-label={showPassword ? "Hide password" : "Show password"}>
+                  {showPassword ? <EyeOff className="h-4 w-4" aria-hidden="true" /> : <Eye className="h-4 w-4" aria-hidden="true" />}
+                </button>
+              </div>
+            </>
+          )}
           {error && <p className="mt-2 text-sm text-red-700" role="alert">{error}</p>}
           <button type="submit" disabled={busy} className="btn-primary mt-5 py-3.5 active:scale-[0.96] sm:w-full sm:py-3.5">
-            <span>{busy ? "Sending secure link…" : "Continue securely"}</span>
+            <span>{busy ? (method === "password" ? "Signing in…" : "Sending secure link…") : (method === "password" ? "Sign in" : "Send secure link")}</span>
             {!busy && <ArrowRight className="h-4 w-4" strokeWidth={2} aria-hidden="true" />}
           </button>
         </>
