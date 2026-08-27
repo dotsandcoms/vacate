@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { AlertTriangle, CalendarDays } from "lucide-react";
+import { CalendarDays } from "lucide-react";
 import Avatar from "@/components/Avatar";
 import { format, parseISO } from "date-fns";
 import { humanDate } from "@/lib/holidays";
@@ -40,55 +40,25 @@ function severity(count: number): {
  */
 export default function CoverageClashes({
   clashes,
-  threshold,
 }: {
   clashes: ClashRow[];
-  threshold: number;
 }) {
   const visible = clashes.slice(0, 8);
   const maxCount = Math.max(1, ...visible.map((c) => c.people.length));
 
   if (clashes.length === 0) {
     return (
-      <section className="panel panel-pad">
-        <div className="mb-3 flex items-start justify-between gap-3">
-          <div>
-            <h2 className="section-title">Coverage clashes</h2>
-            <p className="mt-1 text-xs text-slate-400">
-              Working days in the next 60 with {threshold}+ staff out at once
-            </p>
-          </div>
-        </div>
-        <div className="rounded-xl border border-dashed border-slate-200/80 bg-white/40 px-4 py-8 text-center">
-          <CalendarDays className="mx-auto h-7 w-7 text-slate-300" />
-          <p className="mt-2 text-sm text-slate-500">
-            No clashes ahead — coverage looks clear.
-          </p>
-        </div>
-      </section>
+      <div className="rounded-xl border border-dashed border-slate-200/80 bg-white/40 px-4 py-8 text-center">
+        <CalendarDays className="mx-auto h-7 w-7 text-slate-300" />
+        <p className="mt-2 text-sm text-slate-500">
+          No clashes ahead — coverage looks clear.
+        </p>
+      </div>
     );
   }
 
   return (
-    <section className="panel panel-pad">
-      <div className="mb-4 flex items-start justify-between gap-3">
-        <div>
-          <h2 className="section-title flex items-center gap-2">
-            <AlertTriangle className="h-4 w-4 text-amber-500" />
-            Coverage clashes
-          </h2>
-          <p className="mt-1 text-xs text-slate-400">
-            Working days in the next 60 with {threshold}+ staff out at once
-          </p>
-        </div>
-        <Link
-          href="/calendar"
-          className="shrink-0 text-xs font-medium text-brand-600 hover:text-brand-700"
-        >
-          Open calendar
-        </Link>
-      </div>
-
+    <>
       <ul className="space-y-2">
         {visible.map((c) => {
           const count = c.people.length;
@@ -167,6 +137,6 @@ export default function CoverageClashes({
           team calendar for the full picture.
         </p>
       ) : null}
-    </section>
+    </>
   );
 }

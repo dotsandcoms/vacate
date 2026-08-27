@@ -29,6 +29,31 @@ body {
     animation: route-progress 900ms ease-in-out infinite;
     will-change: transform;
   }
+
+  .dashboard-block-enter {
+    animation: dashboard-block-enter 320ms ease-out both;
+    animation-delay: var(--dashboard-enter-delay, 0ms);
+  }
+
+  .dashboard-collapse {
+    transition-property: grid-template-rows, opacity;
+    transition-duration: 200ms;
+    transition-timing-function: ease-out;
+  }
+
+  .dashboard-chevron {
+    transition: transform 200ms ease-out;
+  }
+
+  .dashboard-toggle {
+    transition-property: scale, background-color, color;
+    transition-duration: 150ms;
+    transition-timing-function: ease-out;
+  }
+
+  .dashboard-toggle:active {
+    scale: 0.96;
+  }
 }
 
 @keyframes route-view-enter {
@@ -48,6 +73,19 @@ body {
   }
   to {
     transform: translateX(360%);
+  }
+}
+
+@keyframes dashboard-block-enter {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+    filter: blur(3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
   }
 }
 

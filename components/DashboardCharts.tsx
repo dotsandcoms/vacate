@@ -16,6 +16,7 @@ import { LeaveRequest, LeaveType } from "@/lib/types";
 import { typeColors } from "@/lib/utils";
 import { config } from "@/lib/config";
 import { reportingWindowLabel } from "@/lib/reporting";
+import DashboardAccordion from "@/components/DashboardAccordion";
 
 const MONTHS = [
   "Jan",
@@ -88,9 +89,11 @@ function monthsThrough(fromIso: string, toIso: string) {
 export default function DashboardCharts({
   requests,
   throughDate,
+  animationOrder = 0,
 }: {
   requests: LeaveRequest[];
   throughDate: string;
+  animationOrder?: number;
 }) {
   const [metric, setMetric] = useState<"days" | "requests">("days");
   const [selectedType, setSelectedType] = useState<LeaveType | null>(null);
@@ -124,9 +127,13 @@ export default function DashboardCharts({
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
-      <section className="panel panel-pad lg:col-span-3">
-        <h2 className="section-title mb-1">Leave days by month</h2>
-        <p className="mb-3 text-xs text-slate-400">{reportingWindowLabel()}</p>
+      <DashboardAccordion
+        id="leave-days-by-month"
+        title="Leave days by month"
+        description={reportingWindowLabel()}
+        animationOrder={animationOrder}
+        className="lg:col-span-3"
+      >
         <div className="h-52">
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={byMonth} margin={{ top: 10, right: 6, left: -24, bottom: 0 }}>
@@ -150,14 +157,15 @@ export default function DashboardCharts({
             </BarChart>
           </ResponsiveContainer>
         </div>
-      </section>
+      </DashboardAccordion>
 
-      <section className="panel panel-pad lg:col-span-2">
-        <div className="flex flex-wrap items-start justify-between gap-2">
-          <div>
-            <h2 className="section-title mb-1">Leave type mix</h2>
-            <p className="text-xs text-slate-400">{reportingWindowLabel()}</p>
-          </div>
+      <DashboardAccordion
+        id="leave-type-mix"
+        title="Leave type mix"
+        description={reportingWindowLabel()}
+        animationOrder={animationOrder + 1}
+        className="lg:col-span-2"
+        headerAside={
           <div
             className="inline-flex rounded-lg bg-slate-100/80 p-0.5"
             aria-label="Chart measure"
@@ -178,7 +186,8 @@ export default function DashboardCharts({
               </button>
             ))}
           </div>
-        </div>
+        }
+      >
         {typeTotal === 0 ? (
           <p className="text-sm text-slate-400 py-4">No leave recorded yet.</p>
         ) : (
@@ -263,7 +272,7 @@ export default function DashboardCharts({
             </ul>
           </>
         )}
-      </section>
+      </DashboardAccordion>
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import CoverageClashes from "@/components/CoverageClashes";
+import DashboardAccordion from "@/components/DashboardAccordion";
 import DashboardCharts from "@/components/DashboardCharts";
 import DepartmentFilter from "@/components/DepartmentFilter";
 import NotificationBell from "@/components/NotificationBell";
@@ -243,7 +244,13 @@ export default async function DashboardPage({
         </div>
       </header>
 
-      <div className="panel overflow-hidden">
+      <DashboardAccordion
+        id="overview"
+        title="Overview"
+        description="Key leave totals at a glance"
+        animationOrder={0}
+        contentClassName=""
+      >
         <div className="grid grid-cols-2 divide-x-0 divide-y divide-slate-100 sm:grid-cols-3 sm:divide-x sm:divide-y-0 lg:grid-cols-6">
           {heroStats.map((s) => {
             const inner = (
@@ -265,18 +272,22 @@ export default async function DashboardPage({
             );
           })}
         </div>
-      </div>
+      </DashboardAccordion>
 
-      <section className="panel panel-pad">
-        <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <h2 className="section-title">Finance (estimated)</h2>
-            <p className="mt-1 text-sm text-slate-500">
-              Cost-to-company of leave — directional only
-            </p>
-          </div>
-          <p className="text-[11px] text-slate-400">{costDisclaimer}</p>
-        </div>
+      <DashboardAccordion
+        id="finance"
+        title="Finance (estimated)"
+        description="Cost-to-company of leave — directional only"
+        headerAside={
+          <p className="hidden text-[11px] text-slate-400 xl:block">
+            {costDisclaimer}
+          </p>
+        }
+        animationOrder={1}
+      >
+        <p className="mb-4 text-[11px] text-slate-400 xl:hidden">
+          {costDisclaimer}
+        </p>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <div className="rounded-xl border border-slate-100 bg-white/50 px-4 py-3">
             <div className="stat-label">Accrued annual liability</div>
@@ -340,12 +351,16 @@ export default async function DashboardPage({
             </ul>
           </div>
         )}
-      </section>
+      </DashboardAccordion>
 
       <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-3">
         <div className="space-y-4 lg:col-span-2">
-          <section className="panel panel-pad">
-            <h2 className="section-title mb-3">Out this week</h2>
+          <DashboardAccordion
+            id="out-this-week"
+            title="Out this week"
+            description="Approved and pending leave in the next 7 days"
+            animationOrder={2}
+          >
             {outThisWeek.length === 0 ? (
               <p className="py-4 text-sm text-slate-400">
                 Full house — nobody
@@ -390,19 +405,39 @@ export default async function DashboardPage({
                 ))}
               </ul>
             )}
-          </section>
+          </DashboardAccordion>
 
-          <CoverageClashes
-            clashes={clashes}
-            threshold={config.clashThreshold}
+          <DashboardAccordion
+            id="coverage-clashes"
+            title="Coverage clashes"
+            description={`Working days in the next 60 with ${config.clashThreshold}+ staff out at once`}
+            headerAside={
+              <Link
+                href="/calendar"
+                className="hidden shrink-0 text-xs font-medium text-brand-600 hover:text-brand-700 sm:block"
+              >
+                Open calendar
+              </Link>
+            }
+            animationOrder={4}
+          >
+            <CoverageClashes clashes={clashes} />
+          </DashboardAccordion>
+
+          <DashboardCharts
+            requests={requests}
+            throughDate={today}
+            animationOrder={6}
           />
-
-          <DashboardCharts requests={requests} throughDate={today} />
         </div>
 
         <div className="space-y-4">
-          <section className="panel panel-pad">
-            <h2 className="section-title mb-3">Stuck approvals</h2>
+          <DashboardAccordion
+            id="stuck-approvals"
+            title="Stuck approvals"
+            description={`Waiting longer than ${config.approvalAgingDays} days`}
+            animationOrder={3}
+          >
             {stuck.length === 0 ? (
               <p className="text-sm text-slate-400">
                 Nothing waiting longer than {config.approvalAgingDays} days.
@@ -445,10 +480,14 @@ export default async function DashboardPage({
                 </Link>
               </p>
             )}
-          </section>
+          </DashboardAccordion>
 
-          <section className="panel panel-pad">
-            <h2 className="section-title mb-3">Sick notes outstanding</h2>
+          <DashboardAccordion
+            id="sick-notes"
+            title="Sick notes outstanding"
+            description="Medical certificates requiring attention"
+            animationOrder={5}
+          >
             {sickNoteMissing.length === 0 ? (
               <p className="text-sm text-slate-400">
                 All sick leave over {config.sickNoteAfterDays} days has a
@@ -487,10 +526,14 @@ export default async function DashboardPage({
                 )}
               </>
             )}
-          </section>
+          </DashboardAccordion>
 
-          <section className="panel panel-pad">
-            <h2 className="section-title mb-3">Low annual balances</h2>
+          <DashboardAccordion
+            id="low-balances"
+            title="Low annual balances"
+            description={`Staff with ${config.lowBalanceDays} days or fewer remaining`}
+            animationOrder={8}
+          >
             {lowBalances.length === 0 ? (
               <p className="text-sm text-slate-400">
                 Nobody under {config.lowBalanceDays} days accrued.
@@ -530,7 +573,7 @@ export default async function DashboardPage({
                 )}
               </>
             )}
-          </section>
+          </DashboardAccordion>
         </div>
       </div>
     </div>
