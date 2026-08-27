@@ -4,6 +4,7 @@ import CoverageClashes from "@/components/CoverageClashes";
 import DashboardAccordion from "@/components/DashboardAccordion";
 import DashboardCharts from "@/components/DashboardCharts";
 import DepartmentFilter from "@/components/DepartmentFilter";
+import LeaveTypeFilter from "@/components/LeaveTypeFilter";
 import NotificationBell from "@/components/NotificationBell";
 import EmployeeSearch from "@/components/EmployeeSearch";
 import Avatar from "@/components/Avatar";
@@ -35,13 +36,20 @@ import {
   reportingWindowLabel,
 } from "@/lib/reporting";
 import { requireUser, scopeRequests } from "@/lib/auth";
+import { LeaveType } from "@/lib/types";
+
+const DASHBOARD_LEAVE_TYPES: LeaveType[] = [
+  "Annual",
+  "Sick",
+  "Family Responsibility",
+];
 
 export const dynamic = "force-dynamic";
 
 export default async function DashboardPage({
   searchParams,
 }: {
-  searchParams?: Promise<{ department?: string }>;
+  searchParams?: Promise<{ department?: string; leaveType?: string }>;
 }) {
   const user = await requireUser();
   const resolvedSearchParams = searchParams ? await searchParams : undefined;
@@ -61,13 +69,25 @@ export default async function DashboardPage({
   const department =
     selectedDept && departments.includes(selectedDept) ? selectedDept : null;
 
+  const requestedLeaveType = resolvedSearchParams?.leaveType?.trim();
+  const leaveType = DASHBOARD_LEAVE_TYPES.includes(
+    requestedLeaveType as LeaveType
+  )
+    ? (requestedLeaveType as LeaveType)
+    : null;
+
   const employees = department
     ? allEmployees.filter((e) => e.department === department)
     : allEmployees;
   const employeeIds = new Set(employees.map((e) => e.id));
-  const requests = scopedRequests.filter((r) => employeeIds.has(r.employeeId));
+  const departmentRequests = scopedRequests.filter((r) =>
+    employeeIds.has(r.employeeId)
+  );
+  const requests = leaveType
+    ? departmentRequests.filter((r) => r.type === leaveType)
+    : departmentRequests;
 
-  const balances = computeBalances(employees, requests);
+  const balances = computeBalances(employees, departmentRequests);
   const empById = Object.fromEntries(employees.map((e) => [e.id, e]));
 
   const today = todayIso();
@@ -201,6 +221,12 @@ export default async function DashboardPage({
                 {" · "}
               </>
             ) : null}
+            {leaveType ? (
+              <>
+                <span className="font-medium text-ink-800">{leaveType}</span>
+                {" leave · "}
+              </>
+            ) : null}
             {employees.length} staff · {leaveDaysLogged} leave days ·{" "}
             {reportingWindowLabel()}
           </p>
@@ -214,6 +240,10 @@ export default async function DashboardPage({
             <DepartmentFilter
               departments={departments}
               selected={department}
+            />
+            <LeaveTypeFilter
+              leaveTypes={DASHBOARD_LEAVE_TYPES}
+              selected={leaveType}
             />
           </Suspense>
           <span
@@ -425,6 +455,7 @@ export default async function DashboardPage({
           </DashboardAccordion>
 
           <DashboardCharts
+            key={`${department ?? "all"}:${leaveType ?? "all"}`}
             requests={requests}
             throughDate={today}
             animationOrder={6}
