@@ -1,7 +1,15 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-const PUBLIC_PATHS = ["/login", "/auth/callback", "/unauthorized", "/api/webhooks/kissflow"];
+const PUBLIC_PATHS = [
+  "/login",
+  "/auth/callback",
+  "/unauthorized",
+  "/api/webhooks/kissflow",
+  // Vercel Cron has no Supabase user session. The route validates CRON_SECRET
+  // itself before performing the read-only Kissflow reconciliation.
+  "/api/cron/kissflow-sync",
+];
 const PAYROLL_PATHS = ["/exports", "/api/exports"];
 const ADMIN_PATHS = ["/users", "/api/users", "/api/employees"];
 
