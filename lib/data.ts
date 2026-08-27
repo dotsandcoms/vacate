@@ -6,6 +6,8 @@ import { exportedRequestIds } from "./exportlog";
 import { computeBalancesBcea } from "./balances";
 import {
   mergeOpeningsOntoEmployees,
+  nameMatchScore,
+  normalizePersonName,
   readOpeningsFile,
 } from "./openings";
 import { applyEmployeeStatus } from "./employee-status";
@@ -15,7 +17,6 @@ const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
 const usingSupabase = Boolean(supabaseUrl && supabaseKey);
-const kissflowOnly = process.env.KISSFLOW_ONLY === "true";
 
 // Supabase holds the historical register plus anything the Kissflow webhook
 // has already written. The live Kissflow poll is merged on top of it — not
@@ -24,9 +25,7 @@ const kissflowOnly = process.env.KISSFLOW_ONLY === "true";
 // exists. Overlap between the two is de-duplicated by Kissflow request ID.
 export { usingKissflow };
 export const activeSource: "both" | "supabase" | "kissflow" | "mock" =
-  usingKissflow && kissflowOnly
-    ? "kissflow"
-    : usingSupabase && usingKissflow
+  usingSupabase && usingKissflow
     ? "both"
     : usingSupabase
     ? "supabase"
@@ -110,22 +109,77 @@ async function withExcelOpenings(employees: Employee[]): Promise<Employee[]> {
 export async function getEmployees(): Promise<Employee[]> {
   if (activeSource === "mock") return withExcelOpenings(mockEmployees);
   if (activeSource === "supabase") {
-    return withExcelOpenings(await getSupabaseEmployees());
+    return getSupabaseEmployees();
   }
   if (activeSource === "kissflow") {
     return withExcelOpenings((await getKissflowData()).employees);
   }
 
-  // "both": Supabase is the base list — it carries the real entitlement
-  // data and the IDs everything else in the app is keyed on. Any Kissflow
-  // employee not already known by employee number gets appended as-is.
-  const [sbEmployees, kf] = await Promise.all([
-    getSupabaseEmployees(),
-    getKissflowData(),
-  ]);
-  const knownEmployeeNos = new Set(sbEmployees.map((e) => e.employeeNo));
-  const extra = kf.employees.filter((e) => !knownEmployeeNos.has(e.employeeNo));
-  return withExcelOpenings([...sbEmployees, ...extra]);
+  // "both": the Supabase roster is the employee master. Kissflow contributes
+  // live leave requests only; people absent from the master are not appended.
+  return getSupabaseEmployees();
+}
+
+function remapKissflowRequestsToMaster(
+  requests: LeaveRequest[],
+  kissflowEmployees: Employee[],
+  masterEmployees: Employee[]
+): LeaveRequest[] {
+  const canonicalEmployeeNo = (value: string) => {
+    const normalized = value.trim().toUpperCase();
+    return /^\d+$/.test(normalized)
+      ? normalized.replace(/^0+(?=\d)/, "")
+      : normalized;
+  };
+  const idByEmployeeNo = new Map(
+    masterEmployees
+      .filter((employee) => employee.employeeNo.trim())
+      .map((employee) => [canonicalEmployeeNo(employee.employeeNo), employee.id])
+  );
+  const idByName = new Map(
+    masterEmployees.map((employee) => [
+      normalizePersonName(employee.name),
+      employee.id,
+    ])
+  );
+  const kissflowEmployeeById = new Map(
+    kissflowEmployees.map((employee) => [employee.id, employee])
+  );
+  const fuzzyIdByKissflowEmployeeId = new Map<string, string | undefined>();
+
+  const fuzzyMasterId = (kissflowEmployee: Employee) => {
+    if (fuzzyIdByKissflowEmployeeId.has(kissflowEmployee.id)) {
+      return fuzzyIdByKissflowEmployeeId.get(kissflowEmployee.id);
+    }
+    const candidates = masterEmployees
+      .map((employee) => ({
+        id: employee.id,
+        score: nameMatchScore(kissflowEmployee.name, employee.name),
+      }))
+      .sort((a, b) => b.score - a.score);
+    const best = candidates[0];
+    const second = candidates[1];
+    const resolved =
+      best &&
+      best.score >= 0.75 &&
+      best.score - (second?.score ?? 0) >= 0.15
+        ? best.id
+        : undefined;
+    fuzzyIdByKissflowEmployeeId.set(kissflowEmployee.id, resolved);
+    return resolved;
+  };
+
+  return requests.flatMap((request) => {
+    const kissflowEmployee = kissflowEmployeeById.get(request.employeeId);
+    if (!kissflowEmployee) return [];
+    const resolvedId =
+      (kissflowEmployee.employeeNo
+        ? idByEmployeeNo.get(canonicalEmployeeNo(kissflowEmployee.employeeNo))
+        : undefined) ??
+      idByName.get(normalizePersonName(kissflowEmployee.name)) ??
+      fuzzyMasterId(kissflowEmployee);
+    return resolvedId ? [{ ...request, employeeId: resolvedId }] : [];
+  });
 }
 
 /** Overlay the export audit log: anything in a batch is locked as Exported. */
@@ -162,33 +216,33 @@ export async function getLeaveRequests(opts?: {
 
   // "both": Supabase requests are authoritative. Any live Kissflow request
   // not yet reflected in Supabase (by Kissflow request ID) is merged in on
-  // top, with its employeeId remapped to match the Supabase employee record
-  // for the same employee number — so it joins correctly everywhere the app
-  // looks up employees by ID.
+  // top, with its employeeId remapped to the Supabase master by employee
+  // number or normalized name. Requests for people absent from the master are
+  // intentionally excluded.
   const [sbEmployees, sbRequests, kf] = await Promise.all([
     getSupabaseEmployees(),
     getSupabaseLeaveRequests(),
     getKissflowData(),
   ]);
-  const idByEmployeeNo = new Map(sbEmployees.map((e) => [e.employeeNo, e.id]));
-  const kfEmployeeById = new Map(kf.employees.map((e) => [e.id, e]));
   const knownKissflowIds = new Set(
     sbRequests.map((r) => r.kissflowId).filter(Boolean)
   );
-  const extra = kf.requests
-    .filter((r) => !knownKissflowIds.has(r.kissflowId))
-    .map((r) => {
-      const kfEmp = kfEmployeeById.get(r.employeeId);
-      const resolvedId = kfEmp ? idByEmployeeNo.get(kfEmp.employeeNo) : undefined;
-      return resolvedId ? { ...r, employeeId: resolvedId } : r;
-    });
+  const extra = remapKissflowRequestsToMaster(
+    kf.requests.filter(
+      (r) =>
+        r.sourceProcessId !== process.env.KISSFLOW_PROCESS_ID ||
+        !knownKissflowIds.has(r.kissflowId)
+    ),
+    kf.employees,
+    sbEmployees
+  );
   const merged = await applyExportLog([...sbRequests, ...extra]);
   return opts?.allDates ? merged : filterReportingWindow(merged);
 }
 
 /**
- * Leave register + payroll export source — Kissflow Process API only.
- * Never merges Supabase history or mock data onto these pages.
+ * Leave register + payroll export source. Supabase supplies the staff master;
+ * Kissflow supplies live requests that match someone in that master.
  */
 export async function getKissflowRegister(): Promise<{
   employees: Employee[];
@@ -198,10 +252,24 @@ export async function getKissflowRegister(): Promise<{
   if (!usingKissflow) {
     return { employees: [], requests: [], source: "unavailable" };
   }
-  const { employees, requests } = await getKissflowData();
+  const { employees: kissflowEmployees, requests: kissflowRequests } =
+    await getKissflowData();
+  if (usingSupabase) {
+    const employees = await getSupabaseEmployees();
+    const requests = remapKissflowRequestsToMaster(
+      kissflowRequests,
+      kissflowEmployees,
+      employees
+    );
+    return {
+      employees,
+      requests: filterReportingWindow(await applyExportLog(requests)),
+      source: "kissflow",
+    };
+  }
   return {
-    employees: await applyEmployeeStatus(employees),
-    requests: filterReportingWindow(await applyExportLog(requests)),
+    employees: await applyEmployeeStatus(kissflowEmployees),
+    requests: filterReportingWindow(await applyExportLog(kissflowRequests)),
     source: "kissflow",
   };
 }

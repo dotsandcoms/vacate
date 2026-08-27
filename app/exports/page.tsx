@@ -20,7 +20,7 @@ export default async function ExportsPage() {
         <h1 className="text-2xl font-semibold tracking-tight">Payroll Exports</h1>
         <p className="mt-1 text-sm text-slate-500">
           {source === "kissflow"
-            ? `Kissflow only · ${reportingWindowLabel()} · approved items ready for payroll`
+            ? `Supabase staff master · live Kissflow requests · ${reportingWindowLabel()}`
             : "Kissflow is not connected — nothing to export"}
         </p>
       </header>

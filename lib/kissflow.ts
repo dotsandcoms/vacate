@@ -8,12 +8,98 @@ import { unstable_cache } from "next/cache";
 
 const subdomain = process.env.KISSFLOW_SUBDOMAIN; // e.g. "utf"
 const accountId = process.env.KISSFLOW_ACCOUNT_ID; // e.g. "Ac4onwiPboXl"
-const processId = process.env.KISSFLOW_PROCESS_ID; // e.g. "Staff_Leave_Request_Test"
+const primaryProcessId = process.env.KISSFLOW_PROCESS_ID; // e.g. "Staff_Leave_Request_Test"
 const keyId = process.env.KISSFLOW_ACCESS_KEY_ID;
 const keySecret = process.env.KISSFLOW_ACCESS_KEY_SECRET;
 
+interface ProcessDefinition {
+  id: string;
+  fixedType?: LeaveType;
+  requireEmployeeNumber?: boolean;
+  fields: {
+    employeeName: string[];
+    employeeNumber: string[];
+    startDate: string[];
+    endDate: string[];
+    attachment: string[];
+    notes?: string[];
+  };
+}
+
+const SYSTEM_COLUMNS = [
+  "_id",
+  "_status",
+  "_note",
+  "_submitted_at",
+  "_completed_at",
+  "_modified_by",
+  "_modified_at",
+  "_created_at",
+  "_created_by",
+  "_progress",
+  "_current_context",
+  "_current_assigned_to",
+];
+
+const configuredProcesses: ProcessDefinition[] = [
+  ...(primaryProcessId
+    ? [
+        {
+          id: primaryProcessId,
+          requireEmployeeNumber: true,
+          fields: {
+            employeeName: ["Staff_Name", "Staff_Name_1", "Staff_Nam"],
+            employeeNumber: ["Employee_Number"],
+            startDate: ["First_Day_of_Leave"],
+            endDate: ["Last_Day_of_Leave"],
+            attachment: [
+              "Form_Attachment",
+              "attachment_1",
+              "Attachment_IDPassport_copy",
+            ],
+          },
+        } satisfies ProcessDefinition,
+      ]
+    : []),
+  {
+    id:
+      process.env.KISSFLOW_FAMILY_PROCESS_ID ||
+      "Family_Responsibility_lapses_at_end_of_l",
+    fixedType: "Family Responsibility",
+    fields: {
+      employeeName: ["Staff_Members_Name"],
+      employeeNumber: ["Employee_Number"],
+      startDate: ["Date_From"],
+      endDate: ["Date_to"],
+      attachment: ["Required_Documentation", "Form_Attachment"],
+      notes: ["Comments"],
+    },
+  },
+  {
+    id: process.env.KISSFLOW_SICK_PROCESS_ID || "Sick_Leave_Register",
+    fixedType: "Sick",
+    fields: {
+      employeeName: ["Staff_member", "Staff_memember"],
+      employeeNumber: ["Employee_Number"],
+      startDate: ["st_day_off_date"],
+      endDate: ["Last_day_off_date"],
+      attachment: [
+        "Attaches_Doctors_Note",
+        "Form_Attachment",
+        "Attachment_IDPassport_copy",
+      ],
+    },
+  },
+];
+
+// Avoid double-reading a process if one of the optional IDs is configured to
+// the same value as another source.
+const processes = configuredProcesses.filter(
+  (process, index, all) => all.findIndex((item) => item.id === process.id) === index
+);
+
 export const usingKissflow = Boolean(
-  subdomain && accountId && processId && keyId && keySecret
+  subdomain && accountId && processes.length && keyId && keySecret
 );
 
 // The API accepts arbitrary page sizes. This process currently has ~2,500
@@ -27,21 +113,7 @@ const EMPLOYEE_NUMBER_ALIASES: Record<string, string> = {
   "2050": "250",
 };
 
-// Request form and workflow fields together. Kissflow's column-selection POST
-// returns both, avoiding a second full paginated sweep for system metadata.
-const ITEM_COLUMNS = [
-  "_id",
-  "_status",
-  "_note",
-  "_submitted_at",
-  "_completed_at",
-  "_modified_by",
-  "_modified_at",
-  "_created_at",
-  "_created_by",
-  "_progress",
-  "_current_context",
-  "_current_assigned_to",
+const PRIMARY_EXTRA_COLUMNS = [
   "Staff_Name",
   "Staff_Name_1",
   "Staff_Nam",
@@ -57,10 +129,27 @@ const ITEM_COLUMNS = [
   "Form_Attachment",
   "attachment_1",
   "Attachment_IDPassport_copy",
-].map((Id) => ({ Id }));
+];
 
-async function fetchItemsPage(page: number): Promise<any> {
-  const url = `https://${subdomain}.kissflow.com/process/2/${accountId}/admin/${processId}/item?page_number=${page}&page_size=${PAGE_SIZE}`;
+function itemColumns(process: ProcessDefinition) {
+  const ids = new Set([
+    ...SYSTEM_COLUMNS,
+    ...process.fields.employeeName,
+    ...process.fields.employeeNumber,
+    ...process.fields.startDate,
+    ...process.fields.endDate,
+    ...process.fields.attachment,
+    ...(process.fields.notes ?? []),
+    ...(process.id === primaryProcessId ? PRIMARY_EXTRA_COLUMNS : []),
+  ]);
+  return Array.from(ids, (Id) => ({ Id }));
+}
+
+async function fetchItemsPage(
+  process: ProcessDefinition,
+  page: number
+): Promise<any> {
+  const url = `https://${subdomain}.kissflow.com/process/2/${accountId}/admin/${process.id}/item?page_number=${page}&page_size=${PAGE_SIZE}`;
   const res = await fetch(url, {
     method: "POST",
     headers: {
@@ -68,20 +157,22 @@ async function fetchItemsPage(page: number): Promise<any> {
       "X-Access-Key-Secret": keySecret!,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ Columns: ITEM_COLUMNS }),
+    body: JSON.stringify({ Columns: itemColumns(process) }),
     // Always fetch fresh — the dashboard is meant to be live.
     cache: "no-store",
   });
   if (!res.ok) {
     const body = await res.text();
-    throw new Error(`Kissflow API ${res.status}: ${body.slice(0, 300)}`);
+    throw new Error(
+      `Kissflow process ${process.id} API ${res.status}: ${body.slice(0, 300)}`
+    );
   }
   return res.json();
 }
 
-async function fetchAllItems(): Promise<any[]> {
+async function fetchAllItems(process: ProcessDefinition): Promise<any[]> {
   const items: any[] = [];
-  const firstData = await fetchItemsPage(1);
+  const firstData = await fetchItemsPage(process, 1);
   const firstRows: any[] = firstData?.Data ?? [];
   items.push(...firstRows);
   if (firstRows.length < PAGE_SIZE) return items;
@@ -95,7 +186,9 @@ async function fetchAllItems(): Promise<any[]> {
       { length: Math.min(concurrency, 41 - start) },
       (_, index) => start + index
     );
-    const pages = await Promise.all(pageNumbers.map(fetchItemsPage));
+    const pages = await Promise.all(
+      pageNumbers.map((page) => fetchItemsPage(process, page))
+    );
     let reachedEnd = false;
     for (const data of pages) {
       if (reachedEnd) break;
@@ -169,14 +262,50 @@ function mapLeaveType(item: any): LeaveType {
   return "Annual";
 }
 
-function employeeName(item: any): string {
-  const staffSelect = item.Staff_Name;
-  if (typeof staffSelect === "string" && staffSelect.trim()) return staffSelect;
-  if (staffSelect && typeof staffSelect === "object" && staffSelect.Name)
-    return staffSelect.Name;
-  if (typeof item.Staff_Name_1 === "string" && item.Staff_Name_1.trim())
-    return item.Staff_Name_1;
+function firstFieldValue(item: any, fieldIds: string[]) {
+  for (const fieldId of fieldIds) {
+    const value = item[fieldId];
+    if (value != null && String(value).trim() !== "") return value;
+  }
+  return undefined;
+}
+
+function displayValue(value: any): string | undefined {
+  if (typeof value === "string" && value.trim()) return value.trim();
+  if (typeof value === "number") return String(value);
+  if (value && typeof value === "object") {
+    const nested = value.Name ?? value.name ?? value.value;
+    if (typeof nested === "string" && nested.trim()) return nested.trim();
+  }
+  return undefined;
+}
+
+function employeeName(item: any, process: ProcessDefinition): string {
+  for (const fieldId of process.fields.employeeName) {
+    const value = displayValue(item[fieldId]);
+    if (value) return value;
+  }
   return item._created_by?.Name ?? "Unknown";
+}
+
+function employeeNumber(item: any, process: ProcessDefinition) {
+  const raw = displayValue(
+    firstFieldValue(item, process.fields.employeeNumber)
+  );
+  return raw ? EMPLOYEE_NUMBER_ALIASES[raw] ?? raw : undefined;
+}
+
+function hasFieldValue(value: any): boolean {
+  if (Array.isArray(value)) return value.length > 0;
+  if (value && typeof value === "object") return Object.keys(value).length > 0;
+  return value != null && String(value).trim() !== "";
+}
+
+function syntheticEmployeeId(process: ProcessDefinition, item: any, name: string) {
+  const reference = firstFieldValue(item, process.fields.employeeName);
+  const referenceId =
+    reference && typeof reference === "object" ? reference._id : undefined;
+  return `${process.id}:staff:${referenceId ?? name.toLowerCase()}`;
 }
 
 export interface KissflowData {
@@ -193,12 +322,12 @@ const CACHE_MS = 60_000;
 const getPersistedKissflowData = unstable_cache(
   loadKissflowData,
   [
-    "kissflow-process-data-v2-single-page",
+    "kissflow-process-data-v3-multi-process",
     subdomain ?? "",
     accountId ?? "",
-    processId ?? "",
+    ...processes.map((process) => process.id),
   ],
-  { revalidate: 60, tags: [`kissflow-process-${processId ?? "unknown"}`] }
+  { revalidate: 60, tags: ["kissflow-leave-processes"] }
 );
 
 export function getKissflowData(): Promise<KissflowData> {
@@ -210,105 +339,130 @@ export function getKissflowData(): Promise<KissflowData> {
 }
 
 async function loadKissflowData(): Promise<KissflowData> {
-  const items = await fetchAllItems();
+  const results = await Promise.allSettled(
+    processes.map(async (process) => ({
+      process,
+      items: await fetchAllItems(process),
+    }))
+  );
+  const successful = results.flatMap((result, index) => {
+    if (result.status === "fulfilled") return [result.value];
+    console.error(
+      `[vacate] Unable to read Kissflow process ${processes[index].id}`,
+      result.reason
+    );
+    return [];
+  });
+  if (successful.length === 0) {
+    throw new Error("None of the configured Kissflow leave processes could be read");
+  }
 
-  const employeesById = new Map<string, Employee>();
-  const requests: LeaveRequest[] = [];
+  const allEmployees = new Map<string, Employee>();
+  const allRequests: LeaveRequest[] = [];
+  const { detectSyncEvents } = await import("./notifications");
 
-  for (const item of items) {
-    // Historical records without an employee number cannot be joined to a
-    // canonical staff member reliably. Hide them until a cleanup/mapping
-    // policy is agreed instead of creating duplicate creator-based identities.
-    if (item.Employee_Number == null || String(item.Employee_Number).trim() === "") {
-      continue;
-    }
+  for (const { process, items } of successful) {
+    const processEmployees = new Map<string, Employee>();
+    const processRequests: LeaveRequest[] = [];
 
-    const name = employeeName(item);
-    const rawEmpNo = String(item.Employee_Number).trim();
-    const empNo = EMPLOYEE_NUMBER_ALIASES[rawEmpNo] ?? rawEmpNo;
-    const empId = empNo;
+    for (const item of items) {
+      const name = employeeName(item, process);
+      const empNo = employeeNumber(item, process);
+      if (process.requireEmployeeNumber && !empNo) continue;
+      const empId = empNo ?? syntheticEmployeeId(process, item, name);
+      const startDate = displayValue(
+        firstFieldValue(item, process.fields.startDate)
+      );
+      const endDate =
+        displayValue(firstFieldValue(item, process.fields.endDate)) ?? startDate;
+      if (!startDate || !endDate) continue;
 
-    if (!employeesById.has(empId)) {
-      employeesById.set(empId, {
-        id: empId,
-        employeeNo: empNo,
-        name,
-        department: "—", // not on the Kissflow form (yet)
-        role: "—",
-        // Placeholder entitlements until the Excel balances are imported.
-        annualEntitlement: 15,
-        sickEntitlement: 30,
-        active: true,
-      });
-    }
+      if (!processEmployees.has(empId)) {
+        processEmployees.set(empId, {
+          id: empId,
+          employeeNo: empNo ?? "",
+          name,
+          department: "—",
+          role: "—",
+          annualEntitlement: 15,
+          sickEntitlement: 30,
+          active: true,
+        });
+      }
 
-    const startDate = item.First_Day_of_Leave ?? "";
-    const endDate = item.Last_Day_of_Leave ?? startDate;
-    if (!startDate) continue; // skip drafts with no dates yet
-
-    const hasAttachment =
-      (Array.isArray(item.Form_Attachment) && item.Form_Attachment.length > 0) ||
-      (Array.isArray(item.attachment_1) && item.attachment_1.length > 0) ||
-      (Array.isArray(item.Attachment_IDPassport_copy) &&
-        item.Attachment_IDPassport_copy.length > 0);
-
-    const sys = item;
-    const rejection = rejectionFromNotes(sys?._note);
-
-    // Multi-step aware: all current assignees (parallel approvers), and the
-    // current step name if Kissflow exposes it in _current_context.
-    const assignees: string[] = (item._current_assigned_to ?? [])
-      .map((a: any) => a?.Name)
-      .filter(Boolean);
-    const ctx = sys?._current_context;
-    const currentStep: string | undefined = Array.isArray(ctx)
-      ? ctx.map((c: any) => c?.Name ?? c?.ActivityName).filter(Boolean).join(", ") || undefined
-      : ctx?.Name ?? ctx?.ActivityName ?? undefined;
-
-    requests.push({
-      id: item._id,
-      kissflowId: item._id,
-      employeeId: empId,
-      type: mapLeaveType(item),
-      startDate,
-      endDate,
-      days: workingDays(startDate, endDate),
-      status: mapStatus(item._status),
-      approvedBy:
-        item._status === "Completed" ? sys?._modified_by?.Name ?? "" : "",
-      approvedAt:
-        (item._status === "Completed" ? sys?._completed_at : undefined) ??
-        item._modified_at ??
-        item._created_at ??
-        "",
-      notes: item.Who_will_stand_in_for_you_whilst?.Name
+      const rejection = rejectionFromNotes(item._note);
+      const assignees: string[] = (item._current_assigned_to ?? [])
+        .map((assignee: any) => assignee?.Name)
+        .filter(Boolean);
+      const context = item._current_context;
+      const currentStep: string | undefined = Array.isArray(context)
+        ? context
+            .map((entry: any) => entry?.Name ?? entry?.ActivityName)
+            .filter(Boolean)
+            .join(", ") || undefined
+        : context?.Name ?? context?.ActivityName ?? undefined;
+      const configuredNote = displayValue(
+        firstFieldValue(item, process.fields.notes ?? [])
+      );
+      const standIn = item.Who_will_stand_in_for_you_whilst?.Name
         ? `Stand-in: ${item.Who_will_stand_in_for_you_whilst.Name}`
         : item.who_will_stand_in_for_you_whilst_on_leave
         ? `Stand-in: ${item.who_will_stand_in_for_you_whilst_on_leave}`
-        : undefined,
-      exportedAt: null,
-      submittedAt: sys?._submitted_at ?? item._created_at ?? undefined,
-      rejectionReason: rejection?.reason,
-      rejectedBy: rejection?.by,
-      rejectedAt: rejection?.at,
-      currentAssignee:
-        item._status !== "Completed" && assignees.length
-          ? assignees.join(", ")
-          : undefined,
-      currentStep,
-      approvalProgress:
-        typeof sys?._progress === "number" ? sys._progress : undefined,
-      hasAttachment,
-    });
+        : undefined;
+
+      processRequests.push({
+        id:
+          process.id === primaryProcessId
+            ? item._id
+            : `${process.id}:${item._id}`,
+        kissflowId: item._id,
+        sourceProcessId: process.id,
+        employeeId: empId,
+        type: process.fixedType ?? mapLeaveType(item),
+        startDate,
+        endDate,
+        days: workingDays(startDate, endDate),
+        status: mapStatus(item._status),
+        approvedBy:
+          item._status === "Completed" ? item._modified_by?.Name ?? "" : "",
+        approvedAt:
+          (item._status === "Completed" ? item._completed_at : undefined) ??
+          item._modified_at ??
+          item._created_at ??
+          "",
+        notes: configuredNote ?? standIn,
+        exportedAt: null,
+        submittedAt: item._submitted_at ?? item._created_at ?? undefined,
+        rejectionReason: rejection?.reason,
+        rejectedBy: rejection?.by,
+        rejectedAt: rejection?.at,
+        currentAssignee:
+          item._status !== "Completed" && assignees.length
+            ? assignees.join(", ")
+            : undefined,
+        currentStep,
+        approvalProgress:
+          typeof item._progress === "number" ? item._progress : undefined,
+        hasAttachment: process.fields.attachment.some((fieldId) =>
+          hasFieldValue(item[fieldId])
+        ),
+      });
+    }
+
+    const employees = Array.from(processEmployees.values());
+    await detectSyncEvents(
+      processRequests,
+      employees,
+      `kissflow:${process.id}`
+    );
+    for (const employee of employees) allEmployees.set(employee.id, employee);
+    allRequests.push(...processRequests);
   }
 
-  const employees = Array.from(employeesById.values()).sort((a, b) =>
-    a.name.localeCompare(b.name)
-  );
-
-  // Fire-and-forget: diff against the previous sync and record notifications.
-  const { detectSyncEvents } = await import("./notifications");
-  detectSyncEvents(requests, employees).catch(() => {});
-
-  return { employees, requests };
+  return {
+    employees: Array.from(allEmployees.values()).sort((a, b) =>
+      a.name.localeCompare(b.name)
+    ),
+    requests: allRequests,
+  };
 }

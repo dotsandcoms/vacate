@@ -33,7 +33,8 @@ export async function POST(req: NextRequest) {
     await addNotification(
       "exported",
       `Payroll batch ${batch.id} exported`,
-      `${batch.requestIds.length} request${batch.requestIds.length === 1 ? "" : "s"} · ${batch.totalDays} days · ${batch.employeeCount} staff — locked against re-export`
+      `${batch.requestIds.length} request${batch.requestIds.length === 1 ? "" : "s"} · ${batch.totalDays} days · ${batch.employeeCount} staff — locked against re-export`,
+      `payroll-export:${batch.id}`
     );
     return NextResponse.json(batch);
   } catch (e: any) {

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { timingSafeEqual } from "node:crypto";
+import { addNotification } from "@/lib/notifications";
 
 /**
  * Kissflow → Vacate webhook.
@@ -78,7 +79,7 @@ export async function POST(req: NextRequest) {
   // Resolve employee by employee number
   const { data: emp, error: empErr } = await sb
     .from("employees")
-    .select("id")
+    .select("id,name")
     .eq("employee_no", payload.employeeNo)
     .single();
   if (empErr || !emp) {
@@ -108,6 +109,18 @@ export async function POST(req: NextRequest) {
   if (error) {
     console.error("[vacate] Webhook upsert failed:", error);
     return NextResponse.json({ error: "Database error" }, { status: 500 });
+  }
+
+  try {
+    await addNotification(
+      "approved",
+      `${emp.name}'s leave approved${payload.approvedBy ? ` by ${String(payload.approvedBy).slice(0, 120)}` : ""}`,
+      `${String(payload.leaveType).slice(0, 80)} · ${String(payload.startDate).slice(0, 10)} to ${String(payload.endDate).slice(0, 10)} — ready for payroll export`,
+      `kissflow:${process.env.KISSFLOW_PROCESS_ID ?? "primary"}:${String(payload.requestId).slice(0, 200)}:approved`
+    );
+  } catch (notificationError) {
+    console.error("[vacate] Webhook notification failed:", notificationError);
+    return NextResponse.json({ error: "Notification persistence failed" }, { status: 500 });
   }
 
   return NextResponse.json({ ok: true });

@@ -42,6 +42,8 @@ export interface Employee {
 export interface LeaveRequest {
   id: string;
   kissflowId: string; // request ID from Kissflow
+  /** Process that owns the request when several Kissflow apps are aggregated. */
+  sourceProcessId?: string;
   employeeId: string;
   type: LeaveType;
   startDate: string; // ISO yyyy-mm-dd

@@ -20,7 +20,7 @@ export default async function RegisterPage() {
         <h1 className="text-2xl font-semibold tracking-tight">Leave Register</h1>
         <p className="mt-1 text-sm text-slate-500">
           {source === "kissflow"
-            ? `Kissflow only · ${reportingWindowLabel()} · no Supabase or Excel history`
+            ? `Supabase staff master · live Kissflow requests · ${reportingWindowLabel()}`
             : "Kissflow is not connected — nothing to show here"}
         </p>
       </header>

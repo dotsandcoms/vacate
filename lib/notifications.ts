@@ -1,8 +1,6 @@
-// Built-in notifications: events are detected by diffing each Kissflow sync
-// against the previous snapshot, then stored on disk (swap for Supabase in
-// production).
-import { promises as fs } from "fs";
-import path from "path";
+// Durable notifications stored in Supabase so Vercel instances and deploys
+// share one consistent event history.
+import { createAdminSupabaseClient } from "./supabase/server";
 import { Employee, LeaveRequest } from "./types";
 import { humanRange } from "./holidays";
 
@@ -15,125 +13,161 @@ export type NotificationType =
 
 export interface AppNotification {
   id: string;
-  at: string; // ISO datetime
+  at: string;
   type: NotificationType;
   title: string;
   body?: string;
   read: boolean;
 }
 
-const DIR = path.join(process.cwd(), ".vacate-data");
-const NOTIF_FILE = path.join(DIR, "notifications.json");
-const SNAPSHOT_FILE = path.join(DIR, "sync-snapshot.json");
-
-async function readJson<T>(file: string, fallback: T): Promise<T> {
-  try {
-    return JSON.parse(await fs.readFile(file, "utf8")) as T;
-  } catch {
-    return fallback;
-  }
+interface NotificationRow {
+  id: string;
+  created_at: string;
+  type: NotificationType;
+  title: string;
+  body: string | null;
 }
 
-async function writeJson(file: string, data: unknown) {
-  await fs.mkdir(DIR, { recursive: true });
-  await fs.writeFile(file, JSON.stringify(data, null, 2), "utf8");
-}
+export async function readNotifications(userId: string): Promise<AppNotification[]> {
+  const admin = createAdminSupabaseClient();
+  const { data: rows, error } = await admin
+    .from("notifications")
+    .select("id,created_at,type,title,body")
+    .order("created_at", { ascending: false })
+    .limit(200);
+  if (error) throw new Error(`Unable to load notifications: ${error.message}`);
 
-export async function readNotifications(): Promise<AppNotification[]> {
-  return readJson<AppNotification[]>(NOTIF_FILE, []);
+  const notifications = (rows ?? []) as NotificationRow[];
+  if (notifications.length === 0) return [];
+
+  const ids = notifications.map((row) => row.id);
+  const { data: reads, error: readsError } = await admin
+    .from("notification_reads")
+    .select("notification_id")
+    .eq("user_id", userId)
+    .in("notification_id", ids);
+  if (readsError) throw new Error(`Unable to load notification state: ${readsError.message}`);
+  const readIds = new Set((reads ?? []).map((row) => row.notification_id));
+
+  return notifications.map((row) => ({
+    id: row.id,
+    at: row.created_at,
+    type: row.type,
+    title: row.title,
+    body: row.body ?? undefined,
+    read: readIds.has(row.id),
+  }));
 }
 
 export async function addNotification(
   type: NotificationType,
   title: string,
-  body?: string
+  body?: string,
+  sourceKey?: string
 ) {
-  const list = await readNotifications();
-  list.push({
-    id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-    at: new Date().toISOString(),
+  const admin = createAdminSupabaseClient();
+  const record = {
     type,
-    title,
-    body,
-    read: false,
-  });
-  await writeJson(NOTIF_FILE, list.slice(-200)); // keep the last 200
+    title: title.slice(0, 500),
+    body: body?.slice(0, 2_000) ?? null,
+    source_key: sourceKey?.slice(0, 500) ?? null,
+  };
+  const query = sourceKey
+    ? admin.from("notifications").upsert(record, { onConflict: "source_key", ignoreDuplicates: true })
+    : admin.from("notifications").insert(record);
+  const { error } = await query;
+  if (error) throw new Error(`Unable to create notification: ${error.message}`);
 }
 
-export async function markAllRead() {
-  const list = await readNotifications();
-  await writeJson(
-    NOTIF_FILE,
-    list.map((n) => ({ ...n, read: true }))
+export async function markAllRead(userId: string) {
+  const admin = createAdminSupabaseClient();
+  const { data: notifications, error } = await admin
+    .from("notifications")
+    .select("id")
+    .order("created_at", { ascending: false })
+    .limit(200);
+  if (error) throw new Error(`Unable to load notifications: ${error.message}`);
+  if (!notifications?.length) return;
+
+  const readAt = new Date().toISOString();
+  const { error: writeError } = await admin.from("notification_reads").upsert(
+    notifications.map(({ id }) => ({ notification_id: id, user_id: userId, read_at: readAt })),
+    { onConflict: "notification_id,user_id" }
   );
+  if (writeError) throw new Error(`Unable to update notifications: ${writeError.message}`);
 }
 
-// ── Sync diffing ─────────────────────────────────────────────────────────
-
-type Snapshot = Record<string, string>; // kissflow item id → status
-
-let detecting = false; // guard against parallel page renders double-writing
+type Snapshot = Record<string, string>;
+let detecting = false;
 
 export async function detectSyncEvents(
   requests: LeaveRequest[],
-  employees: Employee[]
+  employees: Employee[],
+  source = "kissflow-primary"
 ) {
   if (detecting) return;
   detecting = true;
   try {
-    const empName = (id: string) =>
-      employees.find((e) => e.id === id)?.name ?? "Someone";
+    const admin = createAdminSupabaseClient();
+    const { data: stored, error: snapshotError } = await admin
+      .from("kissflow_sync_snapshots")
+      .select("snapshot")
+      .eq("source", source)
+      .maybeSingle();
+    if (snapshotError) throw new Error(`Unable to load Kissflow snapshot: ${snapshotError.message}`);
 
-    const prev = await readJson<Snapshot | null>(SNAPSHOT_FILE, null);
+    const empName = (id: string) => employees.find((e) => e.id === id)?.name ?? "Someone";
+    const prev = stored?.snapshot as Snapshot | undefined;
     const next: Snapshot = {};
-    for (const r of requests) next[r.id] = r.status;
+    for (const request of requests) next[request.id] = request.status;
 
-    // First run: seed the snapshot silently so we don't flood the bell
-    // with historic items.
-    if (prev === null) {
-      await writeJson(SNAPSHOT_FILE, next);
-      return;
-    }
-
-    // "Pending Sync" was renamed to "Approved" — treat them as the same
-    // state so the rename doesn't fire duplicate notifications.
-    const norm = (s: string | undefined) =>
-      s === "Pending Sync" ? "Approved" : s;
-
-    for (const r of requests) {
-      const before = norm(prev[r.id]);
-      const range = humanRange(r.startDate, r.endDate);
-      if (before === undefined) {
-        await addNotification(
-          "new_request",
-          `New leave request from ${empName(r.employeeId)}`,
-          `${r.type} · ${range} · ${r.days} day${r.days === 1 ? "" : "s"} — awaiting approval`
-        );
-      } else if (before !== norm(r.status)) {
-        if (r.status === "Approved" || r.status === "Pending Sync") {
+    // Seed current history silently on the first durable run.
+    if (prev) {
+      const norm = (status: string | undefined) => status === "Pending Sync" ? "Approved" : status;
+      for (const request of requests) {
+        const before = norm(prev[request.id]);
+        const current = norm(request.status);
+        const range = humanRange(request.startDate, request.endDate);
+        if (before === undefined) {
           await addNotification(
-            "approved",
-            `${empName(r.employeeId)}'s leave approved${r.approvedBy ? ` by ${r.approvedBy}` : ""}`,
-            `${r.type} · ${range} — ready for payroll export`
+            "new_request",
+            `New leave request from ${empName(request.employeeId)}`,
+            `${request.type} · ${range} · ${request.days} day${request.days === 1 ? "" : "s"} — awaiting approval`,
+            `${source}:${request.id}:new_request`
           );
-        } else if (r.status === "Rejected") {
-          await addNotification(
-            "rejected",
-            `${empName(r.employeeId)}'s leave rejected${r.rejectedBy ? ` by ${r.rejectedBy}` : ""}`,
-            r.rejectionReason
-              ? `"${r.rejectionReason}" · ${r.type} · ${range}`
-              : `${r.type} · ${range}`
-          );
-        } else if (r.status === "Cancelled") {
-          await addNotification(
-            "system",
-            `${empName(r.employeeId)}'s leave withdrawn`,
-            `${r.type} · ${range}`
-          );
+        } else if (before !== current) {
+          if (current === "Approved") {
+            await addNotification(
+              "approved",
+              `${empName(request.employeeId)}'s leave approved${request.approvedBy ? ` by ${request.approvedBy}` : ""}`,
+              `${request.type} · ${range} — ready for payroll export`,
+              `${source}:${request.id}:approved`
+            );
+          } else if (current === "Rejected") {
+            await addNotification(
+              "rejected",
+              `${empName(request.employeeId)}'s leave rejected${request.rejectedBy ? ` by ${request.rejectedBy}` : ""}`,
+              request.rejectionReason ? `"${request.rejectionReason}" · ${request.type} · ${range}` : `${request.type} · ${range}`,
+              `${source}:${request.id}:rejected`
+            );
+          } else if (current === "Cancelled") {
+            await addNotification(
+              "system",
+              `${empName(request.employeeId)}'s leave withdrawn`,
+              `${request.type} · ${range}`,
+              `${source}:${request.id}:cancelled`
+            );
+          }
         }
       }
     }
-    await writeJson(SNAPSHOT_FILE, next);
+
+    const { error: saveError } = await admin.from("kissflow_sync_snapshots").upsert({
+      source,
+      snapshot: next,
+      updated_at: new Date().toISOString(),
+    });
+    if (saveError) throw new Error(`Unable to save Kissflow snapshot: ${saveError.message}`);
   } finally {
     detecting = false;
   }

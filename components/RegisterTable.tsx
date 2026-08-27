@@ -1,70 +1,101 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
-import { Info, Search } from "lucide-react";
+import { Info, Search, X } from "lucide-react";
 import { Employee, LeaveRequest } from "@/lib/types";
 import { statusStyles } from "@/lib/utils";
 import { humanDate, humanRange } from "@/lib/holidays";
 import Avatar from "./Avatar";
 
 function RejectionInfo({ request }: { request: LeaveRequest }) {
-  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
-  const ref = useRef<HTMLSpanElement>(null);
-
-  const toggle = () => {
-    if (pos) return setPos(null);
-    const rect = ref.current?.getBoundingClientRect();
-    if (!rect) return;
-    const width = 264;
-    setPos({
-      top: rect.bottom + 6,
-      left: Math.max(8, Math.min(rect.right - width, window.innerWidth - width - 8)),
-    });
-  };
+  const [open, setOpen] = useState(false);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const titleId = useId();
 
   useEffect(() => {
-    if (!pos) return;
-    const close = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setPos(null);
+    const dialog = dialogRef.current;
+    if (!dialog || !open) return;
+
+    const handleClose = () => {
+      setOpen(false);
+      triggerRef.current?.focus();
     };
-    const dismiss = () => setPos(null);
-    document.addEventListener("mousedown", close);
-    window.addEventListener("scroll", dismiss, true);
-    window.addEventListener("resize", dismiss);
+    dialog.addEventListener("close", handleClose);
+    dialog.showModal();
+
     return () => {
-      document.removeEventListener("mousedown", close);
-      window.removeEventListener("scroll", dismiss, true);
-      window.removeEventListener("resize", dismiss);
+      dialog.removeEventListener("close", handleClose);
+      if (dialog.open) dialog.close();
     };
-  }, [pos]);
+  }, [open]);
+
+  const close = () => dialogRef.current?.close();
 
   return (
-    <span className="inline-flex" ref={ref}>
+    <span className="inline-flex">
       <button
+        ref={triggerRef}
         type="button"
-        onClick={toggle}
+        onClick={() => setOpen(true)}
         aria-label="Show rejection reason"
-        className="ml-1 text-red-400 hover:text-red-600"
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        className="ml-0.5 inline-flex h-7 w-7 items-center justify-center rounded-full text-red-500 transition-colors hover:bg-red-50 hover:text-red-700"
       >
-        <Info className="h-3.5 w-3.5" />
+        <Info className="h-4 w-4" aria-hidden="true" />
       </button>
-      {pos && (
-        <span
-          className="fixed z-50 w-64 rounded-lg border border-slate-200 bg-white p-3 text-left shadow-panel-lg"
-          style={{ top: pos.top, left: pos.left }}
-        >
-          <span className="block text-xs font-semibold text-red-700 mb-1">
-            Rejected{request.rejectedBy ? ` by ${request.rejectedBy}` : ""}
-            {request.rejectedAt
-              ? ` · ${humanDate(request.rejectedAt.slice(0, 10))}`
-              : ""}
-          </span>
-          <span className="block text-sm text-slate-700 whitespace-pre-wrap">
-            {request.rejectionReason ?? "No reason was recorded in Kissflow."}
-          </span>
-        </span>
-      )}
+      {open &&
+        createPortal(
+          <dialog
+            ref={dialogRef}
+            aria-labelledby={titleId}
+            onCancel={(event) => {
+              event.preventDefault();
+              close();
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "Escape") {
+                event.preventDefault();
+                close();
+              }
+            }}
+            onClick={(event) => {
+              if (event.target === dialogRef.current) close();
+            }}
+            className="m-auto max-h-[calc(100dvh-2rem)] w-[min(26rem,calc(100vw-2rem))] overflow-y-auto overscroll-contain rounded-2xl border border-white/70 bg-white p-0 text-left shadow-panel-lg backdrop:bg-slate-950/30 backdrop:backdrop-blur-[2px]"
+          >
+            <div className="p-5 sm:p-6">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h2 id={titleId} className="text-base font-semibold text-red-700">
+                    Rejected{request.rejectedBy ? ` by ${request.rejectedBy}` : ""}
+                  </h2>
+                  {request.rejectedAt && (
+                    <p className="mt-1 text-xs text-slate-500">
+                      {humanDate(request.rejectedAt.slice(0, 10))}
+                    </p>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={close}
+                  autoFocus
+                  aria-label="Close rejection details"
+                  className="-mr-1 -mt-1 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-800"
+                >
+                  <X className="h-4 w-4" aria-hidden="true" />
+                </button>
+              </div>
+              <p className="mt-4 whitespace-pre-wrap text-sm leading-6 text-slate-700">
+                {request.rejectionReason ?? "No reason was recorded in Kissflow."}
+              </p>
+            </div>
+          </dialog>,
+          document.body
+        )}
     </span>
   );
 }

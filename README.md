@@ -49,6 +49,20 @@ Opens at http://localhost:3000 — runs on **built-in mock data** until Supabase
 All pages and APIs validate the Supabase session on the server. Administrators
 can invite, assign and revoke users from **User Access** in the dashboard.
 
+Notifications are stored durably in Supabase with per-user read state. Run
+`supabase/migrations/003_durable_notifications.sql` before deploying the
+notification changes. Kissflow approvals sent to the secured webhook generate
+notifications immediately; other request and status changes are reconciled
+during the next live Kissflow sync. On Vercel Pro, `vercel.json` runs the
+read-only Kissflow reconciliation every five minutes, including when nobody has
+the dashboard open. Add a long random `CRON_SECRET` to the Production
+environment before deploying; Vercel sends it as a Bearer token automatically.
+
+If the existing Vercel project is owned by a Hobby account, transfer that same
+project to the Pro team before deploying the cron configuration. The transfer
+preserves the live project, domains, environment variables, deployments, and
+Git connection; third-party Vercel integrations should be checked afterwards.
+
 ## Still to come
 - Payroll-specific export format (waiting on payroll system confirmation)
 
