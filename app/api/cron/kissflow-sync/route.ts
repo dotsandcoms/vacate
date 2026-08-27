@@ -9,8 +9,18 @@ export async function GET(request: Request) {
   const secret = process.env.CRON_SECRET;
   const authorization = request.headers.get("authorization");
 
-  if (!secret || authorization !== `Bearer ${secret}`) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!secret) {
+    return NextResponse.json(
+      { error: "Unauthorized", reason: "CRON_SECRET is not configured" },
+      { status: 401 }
+    );
+  }
+
+  if (authorization !== `Bearer ${secret}`) {
+    return NextResponse.json(
+      { error: "Unauthorized", reason: "CRON_SECRET does not match" },
+      { status: 401 }
+    );
   }
 
   if (!usingKissflow) {
