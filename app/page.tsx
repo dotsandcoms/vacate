@@ -12,7 +12,6 @@ import {
   computeBalances,
   getEmployees,
   getLeaveRequests,
-  activeSource,
 } from "@/lib/data";
 import {
   employeeAnnualLiabilityR,
@@ -185,7 +184,6 @@ export default async function DashboardPage({
     { label: "Days taken YTD", value: String(daysYtd) },
   ];
 
-  const isLive = activeSource !== "mock";
   const accruedLiability = leaveLiabilityR(employees, balances);
   const ytdCost = ytdLeaveCostR(requests, employees, reportingFrom(), today);
   const payrollCost = payrollQueueCostR(pendingSync, employees);
@@ -246,29 +244,6 @@ export default async function DashboardPage({
               selected={leaveType}
             />
           </Suspense>
-          <span
-            className={`inline-flex items-center gap-1.5 rounded-full border border-white/60 bg-white/70 px-3 py-1 text-xs font-medium shadow-panel backdrop-blur-md ${
-              isLive ? "text-slate-600" : "border-amber-200/80 text-amber-700"
-            }`}
-          >
-            <span className="relative flex h-1.5 w-1.5">
-              {isLive && (
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-brand-500 opacity-60" />
-              )}
-              <span
-                className={`relative inline-flex h-1.5 w-1.5 rounded-full ${
-                  isLive ? "bg-brand-500" : "bg-amber-500"
-                }`}
-              />
-            </span>
-            {activeSource === "both"
-              ? "Supabase history + Kissflow live sync"
-              : activeSource === "supabase"
-              ? "Supabase (history + Kissflow sync)"
-              : activeSource === "kissflow"
-              ? "utf.kissflow.com"
-              : "Sample data — Supabase not connected"}
-          </span>
           <EmployeeSearch employees={allEmployees} />
           {(user.role === "admin" || user.role === "cfo") && <NotificationBell />}
         </div>
