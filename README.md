@@ -3,7 +3,7 @@
 Kissflow approval → Vacate dashboard → payroll import, with zero human touches.
 
 ## Stack
-- **Next.js 14** (App Router) on **Vercel**
+- **Next.js 16** (App Router) on **Vercel**
 - **Supabase** (Postgres + Auth + Storage)
 - Tailwind CSS, Recharts, lucide-react
 
@@ -64,7 +64,7 @@ preserves the live project, domains, environment variables, deployments, and
 Git connection; third-party Vercel integrations should be checked afterwards.
 
 ## Still to come
-- Payroll-specific export format (waiting on payroll system confirmation)
+- Payroll import acceptance and database installation: see [Payroll export requirements and operator guide](docs/payroll-export-requirements.md).
 
 ## Excel baseline → Kissflow live
 Balances use the Excel leave register as the **opening snapshot**, then

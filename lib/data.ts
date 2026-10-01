@@ -244,7 +244,7 @@ export async function getLeaveRequests(opts?: {
  * Leave register + payroll export source. Supabase supplies the staff master;
  * Kissflow supplies live requests that match someone in that master.
  */
-export async function getKissflowRegister(): Promise<{
+export async function getKissflowRegister(opts?: { allDates?: boolean }): Promise<{
   employees: Employee[];
   requests: LeaveRequest[];
   source: "kissflow" | "unavailable";
@@ -263,13 +263,13 @@ export async function getKissflowRegister(): Promise<{
     );
     return {
       employees,
-      requests: filterReportingWindow(await applyExportLog(requests)),
+      requests: opts?.allDates ? await applyExportLog(requests) : filterReportingWindow(await applyExportLog(requests)),
       source: "kissflow",
     };
   }
   return {
     employees: await applyEmployeeStatus(kissflowEmployees),
-    requests: filterReportingWindow(await applyExportLog(kissflowRequests)),
+    requests: opts?.allDates ? await applyExportLog(kissflowRequests) : filterReportingWindow(await applyExportLog(kissflowRequests)),
     source: "kissflow",
   };
 }

@@ -278,7 +278,7 @@ export default function EmployeeProfileView({
         <div className="mb-5">
           <h2 className="section-title">Leave movements</h2>
           <p className="mt-1 text-sm text-slate-500">
-            Full history synced from Kissflow
+            Leave requests, dates and approval history
           </p>
         </div>
 
@@ -287,51 +287,27 @@ export default function EmployeeProfileView({
             No leave history recorded yet.
           </div>
         ) : (
-          <ul className="divide-y divide-slate-100/80">
-            {history.map((r) => (
-              <li
-                key={r.id}
-                className="flex flex-col gap-3 py-4 first:pt-0 last:pb-0 sm:flex-row sm:items-start sm:justify-between"
-              >
-                <div className="flex gap-3">
-                  <span
-                    className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full"
-                    style={{
-                      backgroundColor: typeColors[r.type] ?? "#94a3b8",
-                    }}
-                  />
-                  <div>
-                    <p className="text-sm font-semibold text-ink-900">
-                      {r.type}
-                      <span className="ml-2 font-normal text-slate-500">
-                        {humanRange(r.startDate, r.endDate)} · {r.days} day
-                        {r.days === 1 ? "" : "s"}
-                      </span>
-                    </p>
-                    <p className="mt-1 text-xs text-slate-500">
-                      Kissflow {r.kissflowId}
-                      {r.approvedBy ? ` · actioned by ${r.approvedBy}` : ""}
-                      {r.approvedAt
-                        ? ` · ${humanDate(r.approvedAt.slice(0, 10))}`
-                        : ""}
-                      {r.notes ? ` · ${r.notes}` : ""}
-                    </p>
-                    {r.status === "Rejected" && r.rejectionReason && (
-                      <p className="mt-2 text-xs text-red-600">
-                        Rejected{r.rejectedBy ? ` by ${r.rejectedBy}` : ""}:{" "}
-                        {r.rejectionReason}
-                      </p>
-                    )}
+          <div className="leave-history">
+            <div className="leave-history-columns" aria-hidden="true"><span>Leave dates</span><span>Leave type</span><span>Days</span><span>Status</span></div>
+            <ul className="leave-history-list">
+              {history.map((r) => (
+                <li key={r.id} className="leave-history-entry">
+                  <div className="leave-history-main">
+                    <div className="leave-history-date"><span>{humanRange(r.startDate, r.endDate)}</span><small>{r.startDate.slice(0, 4) === r.endDate.slice(0, 4) ? r.startDate.slice(0, 4) : `${r.startDate.slice(0, 4)} – ${r.endDate.slice(0, 4)}`}</small></div>
+                    <div className="leave-history-type"><span aria-hidden="true" style={{ backgroundColor: typeColors[r.type] ?? "#94a3b8" }} />{r.type}</div>
+                    <div className="leave-history-days">{r.days}<span> {r.days === 1 ? 'day' : 'days'}</span></div>
+                    <span className={`leave-history-status rounded-full text-xs font-medium ring-1 ${statusStyles[r.status]}`}>{r.status}</span>
                   </div>
-                </div>
-                <span
-                  className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ${statusStyles[r.status]}`}
-                >
-                  {r.status}
-                </span>
-              </li>
-            ))}
-          </ul>
+                  <div className="leave-history-details">
+                    {(r.approvedBy || r.approvedAt) && <p><span className="leave-history-label">Actioned</span>{r.approvedBy && <span>by {r.approvedBy}</span>}{r.approvedAt && <span className="leave-history-action-date">{humanDate(r.approvedAt.slice(0, 10))}</span>}</p>}
+                    {r.notes && <p className="leave-history-note">{r.notes}</p>}
+                    {r.status === "Rejected" && r.rejectionReason && <p className="leave-history-rejection">Rejected{r.rejectedBy ? ` by ${r.rejectedBy}` : ""}: {r.rejectionReason}</p>}
+                    <p className="leave-history-reference"><span className="leave-history-label">Kissflow ref</span><span>{r.kissflowId}</span></p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </div>
         )}
       </section>
     </div>
