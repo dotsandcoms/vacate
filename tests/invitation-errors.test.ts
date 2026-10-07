@@ -1,0 +1,10 @@
+import assert from 'node:assert/strict';
+import { invitationError } from '../lib/invitation-errors';
+assert.match(invitationError({code:'email_address_not_authorized'}),/custom SMTP/);
+assert.match(invitationError({message:'Email address not authorized'}),/custom SMTP/);
+assert.match(invitationError({status:429}),/limit/);
+assert.match(invitationError({message:'Error sending invite email'}),/SMTP settings/);
+assert.match(invitationError({code:'user_already_exists'}),/existing user/);
+assert.match(invitationError(null),/Auth logs/);
+assert.doesNotMatch(invitationError({message:'secret SMTP password'}),/secret/);
+console.log('Invitation error checks passed.');

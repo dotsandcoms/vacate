@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createAdminSupabaseClient } from "@/lib/supabase/server";
 import { authorizeApi, rejectCrossOrigin } from "@/lib/security";
 import type { AppRole } from "@/lib/auth";
+import { invitationError } from "@/lib/invitation-errors";
 
 const ROLES = new Set<AppRole>(["admin", "cfo", "department_manager"]);
 
@@ -78,7 +79,8 @@ export async function POST(request: NextRequest) {
       data: { full_name: name },
     });
     if (error || !data.user) {
-      return NextResponse.json({ error: "Unable to send invitation" }, { status: 400 });
+      console.error("User invitation failed", { code: error?.code, status: error?.status, message: error?.message });
+      return NextResponse.json({ error: invitationError(error) }, { status: error?.status === 429 ? 429 : 400 });
     }
     user = data.user;
   }
