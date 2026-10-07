@@ -104,12 +104,13 @@ export default function UserAccessManager({ currentUserId }: { currentUserId: st
     setError(null);
     setMessage(null);
     setEditingId(user.id);
-    setDraft({ ...user });
+    setDraft({ ...user, active: user.role ? user.active : true });
   };
 
   const saveEdit = async (user: AccessUser) => {
     if (!draft) return;
-    const saved = await update(user, { ...draft, role: draft.role ?? "department_manager" });
+    if (!draft.role) { setError("Choose an access role before saving."); return; }
+    const saved = await update(user, draft);
     if (!saved) return;
     setEditingId(null);
     setDraft(null);
@@ -173,16 +174,17 @@ export default function UserAccessManager({ currentUserId }: { currentUserId: st
               <tr key={user.id} className="hover:bg-slate-50/60">
                 <td className="min-w-56 px-4 py-3">{editingId === user.id && draft ? <div className="space-y-2"><input aria-label="Name" value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} className="input-base px-2.5 py-1.5" maxLength={120} /><input aria-label="Email" type="email" value={draft.email} onChange={(event) => setDraft({ ...draft, email: event.target.value })} className="input-base px-2.5 py-1.5" maxLength={254} /></div> : <><p className="font-medium text-ink-900">{user.name || user.email}</p><p className="text-xs text-slate-400">{user.email}</p></>}</td>
                 <td className="px-4 py-3">
-                  <select value={(editingId === user.id && draft ? draft.role : user.role) ?? "department_manager"} disabled={editingId !== user.id || user.id === currentUserId} onChange={(event) => draft && setDraft({ ...draft, role: event.target.value as AppRole, department: event.target.value === "department_manager" ? draft.department : null })} className="rounded-lg bg-white px-2 py-1.5 text-sm ring-1 ring-inset ring-slate-200 disabled:opacity-50">
+                  <select value={(editingId === user.id && draft ? draft.role : user.role) ?? ""} disabled={editingId !== user.id || user.id === currentUserId} onChange={(event) => draft && setDraft({ ...draft, role: event.target.value as AppRole, department: event.target.value === "department_manager" ? draft.department : null })} className="rounded-lg bg-white px-2 py-1.5 text-sm ring-1 ring-inset ring-slate-200 disabled:opacity-50">
+                    <option value="" disabled>No access assigned</option>
                     {Object.entries(roleLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
                   </select>
                 </td>
-                <td className="min-w-44 px-4 py-3 text-slate-500">{editingId === user.id && draft && draft.role === "department_manager" ? <input aria-label="Department" required value={draft.department ?? ""} onChange={(event) => setDraft({ ...draft, department: event.target.value })} className="input-base px-2.5 py-1.5" maxLength={120} /> : user.department ?? "All departments"}</td>
+                <td className="min-w-44 px-4 py-3 text-slate-500">{editingId === user.id && draft && draft.role === "department_manager" ? <input aria-label="Department" required value={draft.department ?? ""} onChange={(event) => setDraft({ ...draft, department: event.target.value })} className="input-base px-2.5 py-1.5" maxLength={120} /> : user.role ? user.department ?? "All departments" : "—"}</td>
                 <td className="px-4 py-3 text-slate-500">{user.lastSignInAt ? new Date(user.lastSignInAt).toLocaleString("en-ZA", { day: "numeric", month: "short", year: "numeric" }) : "Never"}</td>
                 <td className="px-4 py-3 text-right">
                   <div className="flex items-center justify-end gap-1.5">{editingId === user.id ? <><button type="button" onClick={() => saveEdit(user)} className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200 active:scale-[0.96]" aria-label="Save user"><Check className="h-4 w-4" /></button><button type="button" onClick={() => { setEditingId(null); setDraft(null); }} className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-slate-100 text-slate-500 active:scale-[0.96]" aria-label="Cancel editing"><X className="h-4 w-4" /></button></> : <><button type="button" disabled={user.id === currentUserId} onClick={() => update(user, { active: !user.active })} className={`inline-flex min-h-9 items-center gap-2 rounded-full px-3 text-xs font-medium ring-1 ring-inset transition-[scale,background-color,color] duration-150 active:scale-[0.96] disabled:opacity-50 ${user.active ? "bg-emerald-50 text-emerald-700 ring-emerald-200" : "bg-slate-100 text-slate-500 ring-slate-200"}`}>
                     <ShieldCheck className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden="true" />
-                    {user.active ? "Active" : "Revoked"}
+                    {!user.role ? "No access" : user.active ? "Active" : "Revoked"}
                   </button><button type="button" disabled={user.id === currentUserId} onClick={() => beginEdit(user)} className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 disabled:opacity-30" aria-label={`Edit ${user.name || user.email}`}><Pencil className="h-4 w-4" /></button><button type="button" disabled={user.id === currentUserId} onClick={() => deleteUser(user)} className="inline-flex h-9 w-9 items-center justify-center rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-700 disabled:opacity-30" aria-label={`Delete ${user.name || user.email}`}><Trash2 className="h-4 w-4" /></button></>}</div>
                 </td>
               </tr>

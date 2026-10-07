@@ -128,11 +128,12 @@ export async function PATCH(request: NextRequest) {
   }
 
   const admin = createAdminSupabaseClient();
-  const { data: target } = await admin
+  const { data: target, error: targetError } = await admin
     .from("app_users")
     .select("role,active")
     .eq("user_id", userId)
     .maybeSingle();
+  if (targetError) return NextResponse.json({ error: "Unable to verify current access" }, { status: 500 });
   if (target?.role === "admin" && target.active && (!active || role !== "admin")) {
     const { count } = await admin
       .from("app_users")
@@ -153,18 +154,22 @@ export async function PATCH(request: NextRequest) {
   if (authUpdateError) {
     return NextResponse.json({ error: "Unable to update the user's sign-in details" }, { status: 400 });
   }
-  const { error } = await admin
+  // Auth accounts created directly in Supabase may not yet have an app profile.
+  // Upsert creates that profile as well as updating existing access.
+  const { data: saved, error } = await admin
     .from("app_users")
-    .update({
+    .upsert({
+      user_id: userId,
       email,
       full_name: name || null,
       role,
       department: role === "department_manager" ? department : null,
       active,
       updated_at: new Date().toISOString(),
-    })
-    .eq("user_id", userId);
-  if (error) return NextResponse.json({ error: "Unable to update access" }, { status: 500 });
+    }, { onConflict: "user_id" })
+    .select("user_id")
+    .single();
+  if (error || !saved) return NextResponse.json({ error: "Unable to save access profile" }, { status: 500 });
   return NextResponse.json({ ok: true });
 }
 
