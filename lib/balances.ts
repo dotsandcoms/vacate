@@ -105,11 +105,8 @@ export function computeBalancesBcea(
       const accruedMonths = monthsAccruedAfter(openingDate, today);
       const annualAccrual = accruedMonths * (emp.monthlyAccrual ?? config.annualAccrualPerMonth);
 
-      const annualOpening = emp.openingAnnualBalance ?? 0;
       const annualTaken = takenAfter(requests, emp.id, "Annual", openingDate);
-      const annualRemaining = roundDays(
-        annualOpening + annualAccrual - annualTaken.days
-      );
+      const annualOpening = emp.openingAnnualBalance;
 
       const sickOpening =
         emp.openingSickBalance != null
@@ -136,16 +133,18 @@ export function computeBalancesBcea(
             ), requiresReview: false };
       const frRemaining = roundDays(frOpening - frTaken.days);
 
-      balances.push(
-        {
+      if (annualOpening != null) {
+        balances.push({
           employeeId: emp.id,
           type: "Annual",
           // Entitled = baseline + post-cutover accrual (what they "own" this period)
           entitled: roundDays(annualOpening + annualAccrual),
           taken: annualTaken.days,
-          remaining: annualRemaining,
+          remaining: roundDays(annualOpening + annualAccrual - annualTaken.days),
           requiresReview: annualTaken.requiresReview,
-        },
+        });
+      }
+      balances.push(
         {
           employeeId: emp.id,
           type: "Sick",
@@ -234,7 +233,8 @@ export function employeeAnnualLiabilityR(
   const annual = balances.find(
     (b) => b.employeeId === emp.id && b.type === "Annual"
   );
-  const remaining = annual?.remaining ?? 0;
+  if (!annual) return null;
+  const remaining = annual.remaining;
   const rate = employeeDailyCost(emp);
   if (rate == null) return null;
   // Work in hundredths so half-cent ties match Excel's ROUND, including

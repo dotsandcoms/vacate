@@ -74,8 +74,8 @@ rates. Approved Kissflow leave on or after that date is reserved against the
 opening; November accrual is added at month end. Sick and family responsibility
 openings use the workbook's taken figures and the agreed allowances.
 
-Apply `supabase/migrations/20261028082046_november_2026_leave_openings.sql`
-before the import. The import requires Python 3 and `openpyxl`, plus the
+Apply the November opening migrations in `supabase/migrations/` before the
+import. The import requires Python 3 and `openpyxl`, plus the
 Supabase service role credentials in `.env.local`. Preview first:
 
 ```bash
@@ -89,5 +89,6 @@ npm run import:excel:apply -- --xlsx '/path/to/Leave Balances October 2026_3.xls
 ```
 
 Apply saves a private local backup and uses one database transaction. The
-workbook's incomplete Sizakele record remains on hold; Sanele's missing day rate
-is shown as unavailable. The import verifies all 163 loaded rows afterwards.
+workbook's incomplete Sizakele record is active with her employee number, start
+date and annual opening balance marked TBC; Sanele's missing day rate is TBC.
+The import verifies all 164 loaded rows afterwards.

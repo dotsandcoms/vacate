@@ -50,13 +50,9 @@ def workbook_rows(path):
     if total_days != Decimal("2333.71") or total_value != Decimal("1541224.72"):
         raise ValueError(f"Workbook control totals differ: {total_days} days, R{total_value}")
     result = []
-    held = []
     for row in rows:
         code = str(row[0]).strip()
-        if code == "NP-TBC" and row[12] is None:
-            held.append({"employee_no": code, "name": row[1], "reason": "Code, start date and opening balance require confirmation"})
-            continue
-        if any(row[i] is None for i in (0, 1, 2, 3, 5, 6, 12)):
+        if any(row[i] is None for i in (0, 1, 2, 3, 5, 6)) or (row[12] is None and code != "NP-TBC"):
             raise ValueError(f"Required data missing for {code}")
         result.append({
             "employee_no": code,
@@ -70,9 +66,9 @@ def workbook_rows(path):
             "opening_sick_balance": number(30 - (row[14] or 0)),
             "opening_family_balance": number(3 - (row[15] or 0)),
         })
-    if len(result) != 163 or len(held) != 1:
-        raise ValueError("Unexpected incomplete or held employee rows")
-    return result, held
+    if len(result) != 164:
+        raise ValueError("Expected all 164 workbook employees")
+    return result
 
 
 def api(path, method="GET", body=None):
@@ -129,7 +125,7 @@ def main():
     load_env()
     if "gcbaqynpzicewkcpaevu.supabase.co" not in os.environ.get("NEXT_PUBLIC_SUPABASE_URL", ""):
         raise RuntimeError("Refusing to use a project other than the specified UTF leave project")
-    rows, held = workbook_rows(args.xlsx)
+    rows = workbook_rows(args.xlsx)
     employees = read_all("employees")
     by_no = {str(e["employee_no"]).upper(): e for e in employees}
     if len(by_no) != len(employees):
@@ -142,10 +138,10 @@ def main():
         "opening_as_of": AS_OF,
         "source_rows": 164,
         "load_rows": len(rows),
-        "opening_days": round(sum(r["opening_annual_balance"] for r in rows), 2),
+        "opening_days": round(sum(r["opening_annual_balance"] for r in rows if r["opening_annual_balance"] is not None), 2),
         "new_staff": [{"employee_no": r["employee_no"], "name": r["name"]} for r in rows if r["employee_no"] not in by_no],
         "deactivate": [{"employee_no": e["employee_no"], "name": e["name"]} for e in employees if e.get("active") is not False and e["employee_no"] not in codes],
-        "held": held,
+        "opening_balance_tbc": [{"employee_no": r["employee_no"], "name": r["name"]} for r in rows if r["opening_annual_balance"] is None],
         "missing_rates": missing_rates,
         "accrual_rates": dict(Counter(str(r["monthly_accrual"]) for r in rows)),
         "mode": "apply" if args.apply else "backup" if args.backup_only else "preview",

@@ -63,13 +63,14 @@ export default function EmployeeProfileView({
           <div className="flex items-start gap-4 sm:items-center">
             <Avatar name={employee.name} size="lg" />
             <div>
-              <p className="eyebrow text-brand-700">{employee.employeeNo}</p>
+              <p className="eyebrow text-brand-700">{employee.employeeNo === "NP-TBC" ? "Employee number TBC" : employee.employeeNo}</p>
               <h1 className="mt-1 font-display text-2xl font-semibold tracking-tight text-ink-900 sm:text-3xl">
                 {employee.name}
               </h1>
               <p className="mt-1.5 text-sm text-slate-500">
                 {employee.department} · {employee.role}
               </p>
+              {employee.employeeNo === "NP-TBC" && <p className="mt-1 text-xs text-slate-500">Start date TBC</p>}
               {!isActiveEmployee(employee) && (
                 <p className="mt-3 inline-flex rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600 ring-1 ring-slate-400/30">
                   Inactive · left the company
@@ -88,19 +89,18 @@ export default function EmployeeProfileView({
             <div className="rounded-2xl border border-white/70 bg-white/55 px-5 py-4 backdrop-blur-sm sm:min-w-[11rem] sm:text-right">
               <div className="stat-label">Annual days left</div>
               <div className="stat-value mt-1">
-                {annualRemaining ?? "—"}
-                <span className="text-base font-sans font-normal text-slate-400">
-                  /{annualEntitled ?? "—"}
-                </span>
+                {annualRemaining ?? "TBC"}
+                {annualEntitled != null && <span className="text-base font-sans font-normal text-slate-400">/{annualEntitled}</span>}
               </div>
               {employee.openingBalanceAsOf ? (
                 <p className="mt-2 text-[11px] text-slate-400">
                   Opening balance as at {employee.openingBalanceAsOf === "2026-11-01" ? "1 November 2026" : employee.openingBalanceAsOf}
                   {employee.openingAnnualBalance != null
                     ? ` · opened at ${employee.openingAnnualBalance}`
-                    : ""}
+                    : " · annual opening TBC"}
                 </p>
               ) : null}
+              {employee.monthlyAccrual != null && <p className="mt-1 text-[11px] text-slate-400">{employee.annualEntitlement} days annual entitlement · {employee.monthlyAccrual} days per month</p>}
             </div>
             {canViewFinance && <div className="rounded-2xl border border-white/70 bg-white/55 px-5 py-4 backdrop-blur-sm sm:min-w-[14rem] sm:text-right">
               <div className="stat-label">Leave value</div>
@@ -108,18 +108,18 @@ export default function EmployeeProfileView({
                 <div>
                   <p className="text-xs text-slate-400">Net annual leave value</p>
                   <p className="text-lg font-semibold text-ink-900">
-                    {accruedLiabilityR == null ? "Unavailable" : formatRand(accruedLiabilityR)}
+                    {accruedLiabilityR == null ? "TBC" : formatRand(accruedLiabilityR)}
                   </p>
                 </div>
                 <div>
                   <p className="text-xs text-slate-400">YTD leave cost</p>
                   <p className="text-lg font-semibold text-ink-900">
-                    {employee.dailyCostR === null ? "Unavailable" : formatRand(ytdCostR)}
+                    {employee.dailyCostR === null ? "TBC" : formatRand(ytdCostR)}
                   </p>
                 </div>
               </div>
               <p className="mt-2 text-[11px] text-slate-400">
-                {employee.dailyCostR == null ? "Daily leave rate not supplied" : `Daily leave rate ${formatRand(employee.dailyCostR)}`}
+                {employee.dailyCostR == null ? "Daily leave rate TBC" : `Daily leave rate ${formatRand(employee.dailyCostR)}`}
               </p>
             </div>}
           </div>
@@ -135,6 +135,7 @@ export default function EmployeeProfileView({
           </p>
         </div>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+          {annualRemaining == null && <div className="panel panel-pad-sm"><span className="stat-label normal-case tracking-normal">Annual</span><div className="mt-3 font-display text-2xl font-semibold text-ink-900">TBC</div><p className="mt-2 text-xs text-slate-500">Opening balance to be confirmed.</p></div>}
           {balances.map((b) => {
             const pct =
               b.entitled > 0

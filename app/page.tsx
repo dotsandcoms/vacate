@@ -203,9 +203,9 @@ export default async function DashboardPage({
     .filter((r) => r.liability > 0)
     .sort((a, b) => b.liability - a.liability)
     .slice(0, 8);
-  const missingRateCount = employees.filter((e) => e.dailyCostR === null).length;
-  const costDisclaimer = missingRateCount
-    ? `Based on supplied day rates · ${missingRateCount} ${missingRateCount === 1 ? "employee has" : "employees have"} no day rate and ${missingRateCount === 1 ? "is" : "are"} excluded`
+  const missingValueCount = employees.filter((e) => e.dailyCostR === null || !balances.some((b) => b.employeeId === e.id && b.type === "Annual")).length;
+  const costDisclaimer = missingValueCount
+    ? `Net annual value excludes ${missingValueCount} ${missingValueCount === 1 ? "employee" : "employees"} with a day rate or opening balance marked TBC`
     : "Based on supplied daily leave rates";
 
   return (

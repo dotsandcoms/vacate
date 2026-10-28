@@ -57,6 +57,11 @@ assert.equal(balance('Sick', '2026-11-01').taken, 6);
 const negative = [{ employeeId: 'e', type: 'Annual', entitled: 0, taken: 0, remaining: -1.25 }];
 assert.equal(employeeAnnualLiabilityR(employee, negative), -250);
 assert.equal(employeeAnnualLiabilityR({ ...employee, dailyCostR: null }, negative), null);
+const missingOpening = { ...employee, openingAnnualBalance: null };
+const incompleteBalances = computeBalancesBcea([missingOpening], [], '2026-12-31');
+assert.equal(incompleteBalances.some((b) => b.type === 'Annual'), false);
+assert.equal(employeeAnnualLiabilityR(missingOpening, incompleteBalances), null);
+assert.equal(incompleteBalances.find((b) => b.type === 'Sick').remaining, 24);
 assert.equal(leaveLiabilityR([employee, { ...employee, id: 'missing', dailyCostR: null }], negative), -250);
 for (const [days, rate, expected] of [[5.5, 428.15, 2354.83], [11.5, 428.15, 4923.73], [-6.75, 954.22, -6440.99], [26.5, 314.95, 8346.18]]) {
   assert.equal(employeeAnnualLiabilityR({ ...employee, dailyCostR: rate }, [{ ...negative[0], remaining: days }]), expected);

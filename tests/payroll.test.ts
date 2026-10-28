@@ -9,6 +9,7 @@ for (const change of [{ type: 'Study' }, { days: 1000 }, { days: 0 }, { days: 1.
   assert.ok(payrollRow({ ...request, ...change } as LeaveRequest, employee, options).issues.length);
 }
 assert.ok(payrollRow(request, undefined, options).issues.length);
+assert.ok(payrollRow(request, { ...employee, employeeNo: 'NP-TBC' }, options).issues.includes('Employee number is TBC.'));
 assert.ok(payrollRow(request, { ...employee, employeeNo: '123456789' }, options).issues.length);
 assert.ok(payrollRow(request, employee, options, 'a'.repeat(31)).issues.length);
 assert.equal(payrollRow({ ...request, type: 'Sick', days: 0.5 }, employee, options).fields[1], '0020');

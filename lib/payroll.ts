@@ -26,6 +26,7 @@ export function payrollDate(value: string, format: PayrollOptions['dateFormat'])
 export function payrollRow(request: LeaveRequest, employee: Employee | undefined, options: PayrollOptions, remarks = request.kissflowId) {
   const issues: string[] = [];
   const code = employee?.employeeNo ?? '';
+  if (code.trim().toUpperCase() === 'NP-TBC') issues.push('Employee number is TBC.');
   if (!code.trim() || Array.from(code).length > 8 || /[\r\n\t]/.test(code)) issues.push('Employee Code must contain 1–8 characters.');
   if (!payrollCodes[request.type]) issues.push(`No payroll code supplied for ${request.type}.`);
   if (!validDate(request.startDate) || !validDate(request.endDate)) issues.push('Dates must be valid calendar dates.');
