@@ -5,6 +5,7 @@ import { readExportLog, savePayrollBatch, type ExportBatch } from '@/lib/exportl
 import { getKissflowRegister } from '@/lib/data';
 import { payrollRow, payrollFile, validOptions } from '@/lib/payroll';
 import { authorizeApi, rejectCrossOrigin } from '@/lib/security';
+import { isActiveEmployee } from '@/lib/utils';
 
 export const dynamic = 'force-dynamic';
 export async function GET(req: NextRequest) {
@@ -33,6 +34,8 @@ export async function POST(req: NextRequest) {
     const selected = requestIds.map(id => {
       const request = requests.find(r => r.id === id && r.status === 'Approved');
       if (!request) throw new Error('A selected request is no longer eligible. Refresh the page.');
+      const employee = employees.find(e => e.id === request.employeeId);
+      if (!employee || !isActiveEmployee(employee)) throw new Error('A selected request belongs to an inactive or unknown employee.');
       return request;
     });
     const rows = selected.map(r => {

@@ -5,6 +5,7 @@
 import { Employee, LeaveRequest, LeaveStatus, LeaveType } from "./types";
 import { workingDays } from "./holidays";
 import { unstable_cache } from "next/cache";
+import { correctedEmployeeNo, isUnresolvedJonoCode } from "./kissflow-corrections";
 
 const subdomain = process.env.KISSFLOW_SUBDOMAIN; // e.g. "utf"
 const accountId = process.env.KISSFLOW_ACCOUNT_ID; // e.g. "Ac4onwiPboXl"
@@ -311,6 +312,7 @@ function syntheticEmployeeId(process: ProcessDefinition, item: any, name: string
 export interface KissflowData {
   employees: Employee[];
   requests: LeaveRequest[];
+  unresolved: { processId: string; requestId: string; name: string; startDate: string }[];
 }
 
 // L1 cache de-duplicates calls inside one server process. The Next data cache
@@ -322,7 +324,7 @@ const CACHE_MS = 60_000;
 const getPersistedKissflowData = unstable_cache(
   loadKissflowData,
   [
-    "kissflow-process-data-v3-multi-process",
+    "kissflow-process-data-v4-corrected-identities",
     subdomain ?? "",
     accountId ?? "",
     ...processes.map((process) => process.id),
@@ -359,6 +361,7 @@ async function loadKissflowData(): Promise<KissflowData> {
 
   const allEmployees = new Map<string, Employee>();
   const allRequests: LeaveRequest[] = [];
+  const unresolved: KissflowData["unresolved"] = [];
   const { detectSyncEvents } = await import("./notifications");
 
   for (const { process, items } of successful) {
@@ -367,7 +370,16 @@ async function loadKissflowData(): Promise<KissflowData> {
 
     for (const item of items) {
       const name = employeeName(item, process);
-      const empNo = employeeNumber(item, process);
+      const originalNo = employeeNumber(item, process);
+      const empNo = correctedEmployeeNo(process.id, String(item._id)) ?? originalNo;
+      // Code 0001 was used as a placeholder on unrelated people. Unknown
+      // records must never silently become Jono's leave or payroll entries.
+      if (isUnresolvedJonoCode(empNo)) {
+        console.error(`[vacate] Unresolved employee code 0001: ${process.id}:${item._id}`);
+        unresolved.push({ processId: process.id, requestId: String(item._id), name,
+          startDate: displayValue(firstFieldValue(item, process.fields.startDate)) ?? "" });
+        continue;
+      }
       if (process.requireEmployeeNumber && !empNo) continue;
       const empId = empNo ?? syntheticEmployeeId(process, item, name);
       const startDate = displayValue(
@@ -464,5 +476,6 @@ async function loadKissflowData(): Promise<KissflowData> {
       a.name.localeCompare(b.name)
     ),
     requests: allRequests,
+    unresolved,
   };
 }

@@ -17,7 +17,7 @@ export default async function EmployeesPage() {
           off the dashboard, calendar, and payroll views.
         </p>
       </header>
-      <EmployeeDirectory employees={employees} />
+      <EmployeeDirectory employees={employees.map(({ dailyCostR, ...employee }) => employee)} />
     </div>
   );
 }

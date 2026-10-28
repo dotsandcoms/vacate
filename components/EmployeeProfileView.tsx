@@ -24,9 +24,9 @@ type Props = {
   annualEntitled: number | null;
   onLeaveNow: LeaveRequest | null;
   upcoming: LeaveRequest[];
-  accruedLiabilityR: number;
+  accruedLiabilityR: number | null;
   ytdCostR: number;
-  avgDailyCostR: number;
+  canViewFinance: boolean;
 };
 
 /**
@@ -45,7 +45,7 @@ export default function EmployeeProfileView({
   upcoming,
   accruedLiabilityR,
   ytdCostR,
-  avgDailyCostR,
+  canViewFinance,
 }: Props) {
   return (
     <div className="space-y-6">
@@ -95,34 +95,33 @@ export default function EmployeeProfileView({
               </div>
               {employee.openingBalanceAsOf ? (
                 <p className="mt-2 text-[11px] text-slate-400">
-                  Excel baseline {employee.openingBalanceAsOf}
+                  Opening balance as at {employee.openingBalanceAsOf === "2026-11-01" ? "1 November 2026" : employee.openingBalanceAsOf}
                   {employee.openingAnnualBalance != null
                     ? ` · opened at ${employee.openingAnnualBalance}`
                     : ""}
                 </p>
               ) : null}
             </div>
-            <div className="rounded-2xl border border-white/70 bg-white/55 px-5 py-4 backdrop-blur-sm sm:min-w-[14rem] sm:text-right">
-              <div className="stat-label">Finance (estimated)</div>
+            {canViewFinance && <div className="rounded-2xl border border-white/70 bg-white/55 px-5 py-4 backdrop-blur-sm sm:min-w-[14rem] sm:text-right">
+              <div className="stat-label">Leave value</div>
               <div className="mt-2 flex flex-col gap-2 sm:items-end">
                 <div>
-                  <p className="text-xs text-slate-400">Accrued liability</p>
+                  <p className="text-xs text-slate-400">Net annual leave value</p>
                   <p className="text-lg font-semibold text-ink-900">
-                    {formatRand(accruedLiabilityR)}
+                    {accruedLiabilityR == null ? "Unavailable" : formatRand(accruedLiabilityR)}
                   </p>
                 </div>
                 <div>
                   <p className="text-xs text-slate-400">YTD leave cost</p>
                   <p className="text-lg font-semibold text-ink-900">
-                    {formatRand(ytdCostR)}
+                    {employee.dailyCostR === null ? "Unavailable" : formatRand(ytdCostR)}
                   </p>
                 </div>
               </div>
               <p className="mt-2 text-[11px] text-slate-400">
-                Estimated · avg {formatRand(avgDailyCostR)}/day until payroll
-                salaries import
+                {employee.dailyCostR == null ? "Daily leave rate not supplied" : `Daily leave rate ${formatRand(employee.dailyCostR)}`}
               </p>
-            </div>
+            </div>}
           </div>
         </div>
       </header>
@@ -171,6 +170,7 @@ export default function EmployeeProfileView({
                 <p className="mt-2 text-xs text-slate-500">
                   {b.taken} taken this cycle
                 </p>
+                {b.requiresReview && <p className="mt-2 text-xs text-amber-700">A request spanning the opening date needs review.</p>}
               </div>
             );
           })}

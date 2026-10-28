@@ -12,6 +12,7 @@ import {
 } from "./openings";
 import { applyEmployeeStatus } from "./employee-status";
 import { filterReportingWindow } from "./reporting";
+import { correctedEmployeeNoForStoredRequest } from "./kissflow-corrections";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -55,6 +56,8 @@ function mapEmployeeRow(r: any): Employee {
     role: r.role,
     annualEntitlement: Number(r.annual_entitlement),
     sickEntitlement: Number(r.sick_entitlement),
+    monthlyAccrual: r.monthly_accrual != null ? Number(r.monthly_accrual) : null,
+    dailyCostR: null,
     openingAnnualBalance:
       r.opening_annual_balance != null
         ? Number(r.opening_annual_balance)
@@ -75,7 +78,22 @@ async function getSupabaseEmployees(): Promise<Employee[]> {
   const sb = getSupabase()!;
   const { data, error } = await sb.from("employees").select("*").order("name");
   if (error) throw error;
-  return (data ?? []).map(mapEmployeeRow);
+  const employees = (data ?? []).map(mapEmployeeRow);
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!serviceKey) return employees;
+  const admin = createClient(supabaseUrl!, serviceKey, {
+    global: { fetch: (url, opts) => fetch(url, { ...opts, cache: "no-store" }) },
+  });
+  const rates = await admin.from("employee_leave_rates").select("employee_id,daily_cost_r");
+  if (rates.error) {
+    console.error("[vacate] Employee leave rates unavailable", rates.error.message);
+    return employees;
+  }
+  const byId = new Map((rates.data ?? []).map((r: any) => [r.employee_id, r.daily_cost_r]));
+  return employees.map((employee) => ({
+    ...employee,
+    dailyCostR: byId.get(employee.id) != null ? Number(byId.get(employee.id)) : null,
+  }));
 }
 
 async function getSupabaseLeaveRequests(): Promise<LeaveRequest[]> {
@@ -224,19 +242,34 @@ export async function getLeaveRequests(opts?: {
     getSupabaseLeaveRequests(),
     getKissflowData(),
   ]);
-  const knownKissflowIds = new Set(
-    sbRequests.map((r) => r.kissflowId).filter(Boolean)
-  );
-  const extra = remapKissflowRequestsToMaster(
-    kf.requests.filter(
-      (r) =>
-        r.sourceProcessId !== process.env.KISSFLOW_PROCESS_ID ||
-        !knownKissflowIds.has(r.kissflowId)
-    ),
+  const liveRequests = remapKissflowRequestsToMaster(
+    kf.requests,
     kf.employees,
     sbEmployees
   );
-  const merged = await applyExportLog([...sbRequests, ...extra]);
+  const masterByNo = new Map(sbEmployees.map((e) => [e.employeeNo, e.id]));
+  const correctedStored = await applyExportLog(sbRequests.map((r) => {
+    const no = correctedEmployeeNoForStoredRequest(r.kissflowId);
+    const id = no && masterByNo.get(no);
+    return id ? { ...r, employeeId: id } : r;
+  }));
+  const liveByKissflowId = new Map(liveRequests.map((r) => [r.kissflowId, r]));
+  const matchedIds = new Set<string>();
+  const jonoId = masterByNo.get("0001");
+  const stored = correctedStored.flatMap((r) => {
+    const live = liveByKissflowId.get(r.kissflowId);
+    if (live) {
+      matchedIds.add(live.id);
+      return [{ ...live, status: r.status === "Exported" ? "Exported" as const : live.status,
+        exportedAt: r.exportedAt ?? live.exportedAt }];
+    }
+    if (r.employeeId === jonoId) {
+      console.error(`[vacate] Unresolved stored employee code 0001: ${r.kissflowId}`);
+      return [];
+    }
+    return [r];
+  });
+  const merged = await applyExportLog([...stored, ...liveRequests.filter((r) => !matchedIds.has(r.id))]);
   return opts?.allDates ? merged : filterReportingWindow(merged);
 }
 
@@ -248,11 +281,12 @@ export async function getKissflowRegister(opts?: { allDates?: boolean }): Promis
   employees: Employee[];
   requests: LeaveRequest[];
   source: "kissflow" | "unavailable";
+  unresolved: { processId: string; requestId: string; name: string; startDate: string }[];
 }> {
   if (!usingKissflow) {
-    return { employees: [], requests: [], source: "unavailable" };
+    return { employees: [], requests: [], source: "unavailable", unresolved: [] };
   }
-  const { employees: kissflowEmployees, requests: kissflowRequests } =
+  const { employees: kissflowEmployees, requests: kissflowRequests, unresolved } =
     await getKissflowData();
   if (usingSupabase) {
     const employees = await getSupabaseEmployees();
@@ -265,12 +299,14 @@ export async function getKissflowRegister(opts?: { allDates?: boolean }): Promis
       employees,
       requests: opts?.allDates ? await applyExportLog(requests) : filterReportingWindow(await applyExportLog(requests)),
       source: "kissflow",
+      unresolved,
     };
   }
   return {
     employees: await applyEmployeeStatus(kissflowEmployees),
     requests: opts?.allDates ? await applyExportLog(kissflowRequests) : filterReportingWindow(await applyExportLog(kissflowRequests)),
     source: "kissflow",
+    unresolved,
   };
 }
 

@@ -1,6 +1,7 @@
 import ExportPanel from "@/components/ExportPanel";
 import { getKissflowRegister } from "@/lib/data";
 import { requireUser } from "@/lib/auth";
+import { activeEmployees } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
 
@@ -8,8 +9,9 @@ export default async function ExportsPage() {
   await requireUser(["admin", "cfo"]);
   const { employees: allEmployees, requests: allRequests, source } =
     await getKissflowRegister({ allDates: true });
-  const employees = allEmployees;
-  const requests = allRequests;
+  const employees = activeEmployees(allEmployees);
+  const ids = new Set(employees.map((e) => e.id));
+  const requests = allRequests.filter((r) => ids.has(r.employeeId));
 
   return (
     <div className="space-y-6">
@@ -21,7 +23,7 @@ export default async function ExportsPage() {
             : "Connect Kissflow to load approved leave."}
         </p>
       </header>
-      <ExportPanel employees={employees} requests={requests} />
+      <ExportPanel employees={employees.map(({ dailyCostR, ...employee }) => employee)} requests={requests} />
       {source !== "kissflow" && (
         <div className="panel panel-pad text-sm text-slate-500">
           Set the Kissflow env vars to load approved leave for export.

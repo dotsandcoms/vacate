@@ -7,8 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "import:excel": "npx tsx scripts/import-excel-baseline.ts",
-    "import:excel:apply": "npx tsx scripts/import-excel-baseline.ts --apply-supabase"
+    "import:excel": "python3 scripts/import-november-2026.py",
+    "import:excel:apply": "python3 scripts/import-november-2026.py --apply"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.4",

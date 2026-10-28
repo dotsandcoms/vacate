@@ -8,30 +8,38 @@
 // Fallback (no Excel opening): original BCEA pro-rata engine.
 import { Employee, LeaveRequest, LeaveBalance, LeaveType } from "./types";
 import { config } from "./config";
-import { todayIso } from "./holidays";
+import { addDaysIso, todayIso, workingDays } from "./holidays";
 
 const COUNTED_STATUSES = new Set(["Approved", "Pending Sync", "Exported"]);
 
-function roundQuarter(n: number): number {
-  return Math.round(n * 4) / 4;
+function roundDays(n: number): number {
+  return Math.sign(n) * Math.round((Math.abs(n) + Number.EPSILON) * 100) / 100;
 }
 
 function takenAfter(
   requests: LeaveRequest[],
   employeeId: string,
   type: LeaveType,
-  asOfExclusiveEnd: string
-): number {
-  // Leave that *starts* on or before as-of is assumed already in the Excel due row.
-  return requests
-    .filter(
-      (r) =>
-        r.employeeId === employeeId &&
-        r.type === type &&
-        COUNTED_STATUSES.has(r.status) &&
-        r.startDate > asOfExclusiveEnd
-    )
-    .reduce((s, r) => s + r.days, 0);
+  fromIso: string,
+  toIso?: string
+): { days: number; requiresReview: boolean } {
+  let days = 0;
+  let requiresReview = false;
+  for (const r of requests) {
+    if (r.employeeId !== employeeId || r.type !== type ||
+        !COUNTED_STATUSES.has(r.status) || r.endDate < fromIso ||
+        (toIso && r.startDate > toIso)) continue;
+    const start = r.startDate < fromIso ? fromIso : r.startDate;
+    const end = toIso && r.endDate > toIso ? toIso : r.endDate;
+    if (start === r.startDate && end === r.endDate) {
+      days += Number(r.days);
+    } else if (workingDays(r.startDate, r.endDate) === Number(r.days)) {
+      days += workingDays(start, end);
+    } else {
+      requiresReview = true;
+    }
+  }
+  return { days: roundDays(days), requiresReview };
 }
 
 function takenInWindow(
@@ -53,11 +61,13 @@ function takenInWindow(
     .reduce((s, r) => s + r.days, 0);
 }
 
-/** Full month-ends strictly after asOf up to and including today's month. */
+/** Month-ends on or after the opening date, through the current date. */
 export function monthsAccruedAfter(asOfIso: string, todayIsoDate: string): number {
+  if (todayIsoDate < asOfIso) return 0;
   const [ay, am] = asOfIso.split("-").map(Number);
-  const [ty, tm] = todayIsoDate.split("-").map(Number);
-  return Math.max(0, (ty - ay) * 12 + (tm - am));
+  const [ty, tm, td] = todayIsoDate.split("-").map(Number);
+  const currentMonthEnd = new Date(Date.UTC(ty, tm, 0)).getUTCDate();
+  return Math.max(0, (ty - ay) * 12 + (tm - am) + (td === currentMonthEnd ? 1 : 0));
 }
 
 function hasExcelBaseline(emp: Employee): boolean {
@@ -73,9 +83,10 @@ function hasExcelBaseline(emp: Employee): boolean {
  */
 export function computeBalancesBcea(
   employees: Employee[],
-  requests: LeaveRequest[]
+  requests: LeaveRequest[],
+  asOfDate = todayIso()
 ): LeaveBalance[] {
-  const today = todayIso();
+  const today = asOfDate;
   const year = Number(today.slice(0, 4));
   const cycleStart = `${year}-${String(config.cycleStartMonth).padStart(2, "0")}-01`;
   const monthsElapsed =
@@ -88,13 +99,16 @@ export function computeBalancesBcea(
     if (hasExcelBaseline(emp)) {
       const asOf =
         emp.openingBalanceAsOf?.slice(0, 10) || config.excelBaselineAsOf;
-      const accruedMonths = monthsAccruedAfter(asOf, today);
-      const annualAccrual = accruedMonths * config.annualAccrualPerMonth;
+      // Earlier imports use the final included day; the November import uses
+      // the first day of the opening period.
+      const openingDate = asOf >= "2026-11-01" ? asOf : addDaysIso(asOf, 1);
+      const accruedMonths = monthsAccruedAfter(openingDate, today);
+      const annualAccrual = accruedMonths * (emp.monthlyAccrual ?? config.annualAccrualPerMonth);
 
       const annualOpening = emp.openingAnnualBalance ?? 0;
-      const annualTaken = takenAfter(requests, emp.id, "Annual", asOf);
-      const annualRemaining = roundQuarter(
-        annualOpening + annualAccrual - annualTaken
+      const annualTaken = takenAfter(requests, emp.id, "Annual", openingDate);
+      const annualRemaining = roundDays(
+        annualOpening + annualAccrual - annualTaken.days
       );
 
       const sickOpening =
@@ -103,45 +117,50 @@ export function computeBalancesBcea(
           : emp.sickEntitlement;
       const sickTaken =
         emp.openingSickBalance != null
-          ? takenAfter(requests, emp.id, "Sick", asOf)
-          : takenInWindow(requests, emp.id, "Sick", sickFrom, today);
-      const sickRemaining = roundQuarter(sickOpening - sickTaken);
+          ? takenAfter(requests, emp.id, "Sick", openingDate)
+          : { days: takenInWindow(requests, emp.id, "Sick", sickFrom, today), requiresReview: false };
+      const sickRemaining = roundDays(sickOpening - sickTaken.days);
 
-      const frOpening = emp.openingFamilyBalance ?? 3;
+      const openingYear = Number(openingDate.slice(0, 4));
+      const frOpening = year > openingYear ? 3 : emp.openingFamilyBalance ?? 3;
+      const frFrom = year > openingYear ? `${year}-01-01` : openingDate;
       const frTaken =
         emp.openingFamilyBalance != null
-          ? takenAfter(requests, emp.id, "Family Responsibility", asOf)
-          : takenInWindow(
+          ? takenAfter(requests, emp.id, "Family Responsibility", frFrom, `${Math.max(year, openingYear)}-12-31`)
+          : { days: takenInWindow(
               requests,
               emp.id,
               "Family Responsibility",
               `${year}-01-01`,
               `${year}-12-31`
-            );
-      const frRemaining = roundQuarter(frOpening - frTaken);
+            ), requiresReview: false };
+      const frRemaining = roundDays(frOpening - frTaken.days);
 
       balances.push(
         {
           employeeId: emp.id,
           type: "Annual",
           // Entitled = baseline + post-cutover accrual (what they "own" this period)
-          entitled: roundQuarter(annualOpening + annualAccrual),
-          taken: annualTaken,
+          entitled: roundDays(annualOpening + annualAccrual),
+          taken: annualTaken.days,
           remaining: annualRemaining,
+          requiresReview: annualTaken.requiresReview,
         },
         {
           employeeId: emp.id,
           type: "Sick",
-          entitled: roundQuarter(sickOpening),
-          taken: sickTaken,
+          entitled: roundDays(emp.sickEntitlement),
+          taken: roundDays(emp.sickEntitlement - sickOpening + sickTaken.days),
           remaining: sickRemaining,
+          requiresReview: sickTaken.requiresReview,
         },
         {
           employeeId: emp.id,
           type: "Family Responsibility",
-          entitled: roundQuarter(frOpening),
-          taken: frTaken,
+          entitled: 3,
+          taken: roundDays(3 - frOpening + frTaken.days),
           remaining: frRemaining,
+          requiresReview: frTaken.requiresReview,
         }
       );
       continue;
@@ -150,7 +169,7 @@ export function computeBalancesBcea(
     // ── Fallback BCEA ────────────────────────────────────────────────────
     const annualAccrued = Math.min(
       emp.annualEntitlement,
-      roundQuarter(monthsElapsed * config.annualAccrualPerMonth)
+      roundDays(monthsElapsed * (emp.monthlyAccrual ?? config.annualAccrualPerMonth))
     );
     const annualTaken = takenInWindow(
       requests,
@@ -180,7 +199,7 @@ export function computeBalancesBcea(
         type: "Annual",
         entitled: annualAccrued,
         taken: annualTaken,
-        remaining: roundQuarter(annualAccrued - annualTaken),
+        remaining: roundDays(annualAccrued - annualTaken),
       },
       {
         employeeId: emp.id,
@@ -203,21 +222,25 @@ export function computeBalancesBcea(
 }
 
 /** Estimated cost of one working day for an employee (placeholder until payroll). */
-export function employeeDailyCost(emp: Employee | undefined): number {
-  return emp?.dailyCostR ?? config.avgDailyCostR;
+export function employeeDailyCost(emp: Employee | undefined): number | null {
+  return emp?.dailyCostR === null ? null : emp?.dailyCostR ?? config.avgDailyCostR;
 }
 
 /** Rand value of one employee's accrued-but-untaken annual leave. */
 export function employeeAnnualLiabilityR(
   emp: Employee,
   balances: LeaveBalance[]
-): number {
+): number | null {
   const annual = balances.find(
     (b) => b.employeeId === emp.id && b.type === "Annual"
   );
   const remaining = annual?.remaining ?? 0;
-  if (remaining <= 0) return 0;
-  return remaining * employeeDailyCost(emp);
+  const rate = employeeDailyCost(emp);
+  if (rate == null) return null;
+  // Work in hundredths so half-cent ties match Excel's ROUND, including
+  // negative balances, without binary floating-point rounding drift.
+  const product = Math.round(remaining * 100) * Math.round(rate * 100);
+  return Math.sign(product) * Math.round(Math.abs(product) / 100) / 100;
 }
 
 /** Rand value of accrued-but-untaken annual leave across the company. */
@@ -226,7 +249,7 @@ export function leaveLiabilityR(
   balances: LeaveBalance[]
 ): number {
   return employees.reduce(
-    (sum, emp) => sum + employeeAnnualLiabilityR(emp, balances),
+    (sum, emp) => sum + (employeeAnnualLiabilityR(emp, balances) ?? 0),
     0
   );
 }
@@ -253,7 +276,7 @@ export function ytdLeaveCostR(
         (empId ? r.employeeId === empId : true)
     )
     .reduce(
-      (sum, r) => sum + r.days * employeeDailyCost(byId[r.employeeId]),
+      (sum, r) => sum + r.days * (employeeDailyCost(byId[r.employeeId]) ?? 0),
       0
     );
 }
@@ -267,11 +290,11 @@ export function payrollQueueCostR(
   return requests
     .filter((r) => r.status === "Approved")
     .reduce(
-      (sum, r) => sum + r.days * employeeDailyCost(byId[r.employeeId]),
+      (sum, r) => sum + r.days * (employeeDailyCost(byId[r.employeeId]) ?? 0),
       0
     );
 }
 
 export function formatRand(v: number): string {
-  return "R" + Math.round(v).toLocaleString("en-ZA").replace(/,/g, " ");
+  return "R" + v.toLocaleString("en-ZA", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).replace(/,/g, " ");
 }

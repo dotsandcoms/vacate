@@ -66,23 +66,28 @@ Git connection; third-party Vercel integrations should be checked afterwards.
 ## Still to come
 - Payroll import acceptance and database installation: see [Payroll export requirements and operator guide](docs/payroll-export-requirements.md).
 
-## Excel baseline → Kissflow live
-Balances use the Excel leave register as the **opening snapshot**, then
-Kissflow (via Supabase merge) for leave after the cutover date.
+## November 2026 openings → Kissflow live
 
-1. Run the migration in Supabase SQL editor:
-   `supabase/migrations/001_opening_balances.sql`
-2. Import openings (writes `.vacate-data/excel-openings.json`):
-   ```bash
-   npm run import:excel -- --as-of 2026-06-30
-   ```
-3. Optionally push openings into Supabase employees:
-   ```bash
-   npm run import:excel:apply -- --as-of 2026-06-30
-   ```
-4. Verify a few staff:
-   ```bash
-   npx tsx scripts/verify-baseline.ts
-   ```
+The approved `Leave app load (Brad)` workbook sheet supplies opening balances
+as at **1 November 2026**, individual monthly accrual rates and daily leave
+rates. Approved Kissflow leave on or after that date is reserved against the
+opening; November accrual is added at month end. Sick and family responsibility
+openings use the workbook's taken figures and the agreed allowances.
 
-Formula: `remaining = Excel due-as-at + (1.25 × months after cutover) − leave starting after cutover`.
+Apply `supabase/migrations/20261028082046_november_2026_leave_openings.sql`
+before the import. The import requires Python 3 and `openpyxl`, plus the
+Supabase service role credentials in `.env.local`. Preview first:
+
+```bash
+npm run import:excel -- --xlsx '/path/to/Leave Balances October 2026_3.xlsx'
+```
+
+After reviewing the preview, apply the same workbook:
+
+```bash
+npm run import:excel:apply -- --xlsx '/path/to/Leave Balances October 2026_3.xlsx'
+```
+
+Apply saves a private local backup and uses one database transaction. The
+workbook's incomplete Sizakele record remains on hold; Sanele's missing day rate
+is shown as unavailable. The import verifies all 163 loaded rows afterwards.

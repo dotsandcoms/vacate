@@ -197,13 +197,16 @@ export default async function DashboardPage({
         employeeId: emp.id,
         name: emp.name,
         remaining: annual?.remaining ?? 0,
-        liability,
+        liability: liability ?? 0,
       };
     })
     .filter((r) => r.liability > 0)
     .sort((a, b) => b.liability - a.liability)
     .slice(0, 8);
-  const costDisclaimer = `Estimated · avg ${formatRand(config.avgDailyCostR)}/day until payroll salaries import`;
+  const missingRateCount = employees.filter((e) => e.dailyCostR === null).length;
+  const costDisclaimer = missingRateCount
+    ? `Based on supplied day rates · ${missingRateCount} ${missingRateCount === 1 ? "employee has" : "employees have"} no day rate and ${missingRateCount === 1 ? "is" : "are"} excluded`
+    : "Based on supplied daily leave rates";
 
   return (
     <div className="space-y-6">
@@ -228,6 +231,9 @@ export default async function DashboardPage({
             {employees.length} staff · {leaveDaysLogged} leave days ·{" "}
             {reportingWindowLabel()}
           </p>
+          {employees.some((e) => e.openingBalanceAsOf === "2026-11-01") && (
+            <p className="mt-1 text-xs text-slate-500">Opening balances as at 1 November 2026 · approved future leave is reserved</p>
+          )}
         </div>
         <div className="flex w-full flex-wrap items-center gap-3 sm:w-auto">
           <Suspense
@@ -244,7 +250,7 @@ export default async function DashboardPage({
               selected={leaveType}
             />
           </Suspense>
-          <EmployeeSearch employees={allEmployees} />
+          <EmployeeSearch employees={allEmployees.map(({ dailyCostR, ...employee }) => employee)} />
           {(user.role === "admin" || user.role === "cfo") && <NotificationBell />}
         </div>
       </header>
@@ -279,10 +285,10 @@ export default async function DashboardPage({
         </div>
       </DashboardAccordion>
 
-      <DashboardAccordion
+      {(user.role === "admin" || user.role === "cfo") && <DashboardAccordion
         id="finance"
-        title="Finance (estimated)"
-        description="Cost-to-company of leave — directional only"
+        title="Leave value"
+        description="Annual balances and leave costs using supplied day rates"
         headerAside={
           <p className="hidden text-[11px] text-slate-400 xl:block">
             {costDisclaimer}
@@ -295,7 +301,7 @@ export default async function DashboardPage({
         </p>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <div className="rounded-xl border border-slate-100 bg-white/50 px-4 py-3">
-            <div className="stat-label">Accrued annual liability</div>
+            <div className="stat-label">Net annual leave value</div>
             <div className="stat-value mt-1">{formatRand(accruedLiability)}</div>
             <p className="mt-1 text-xs text-slate-400">
               Untaken annual days × day rate
@@ -356,7 +362,7 @@ export default async function DashboardPage({
             </ul>
           </div>
         )}
-      </DashboardAccordion>
+      </DashboardAccordion>}
 
       <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-3">
         <div className="space-y-4 lg:col-span-2">

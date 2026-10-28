@@ -26,7 +26,7 @@ export default async function CalendarPage() {
           {reportingWindowLabel()}
         </p>
       </header>
-      <TeamCalendar employees={employees} requests={activeRequests} />
+      <TeamCalendar employees={employees.map(({ dailyCostR, ...employee }) => employee)} requests={activeRequests} />
     </div>
   );
 }

@@ -24,7 +24,9 @@ export interface Employee {
   sickEntitlement: number;
   /** Estimated cost per working day in Rand — used for leave liability.
    *  Placeholder until real salary data is imported. */
-  dailyCostR?: number;
+  dailyCostR?: number | null;
+  /** Individual monthly accrual in days, rounded as in the payroll workbook. */
+  monthlyAccrual?: number | null;
   /** Excel annual days remaining at cutover (due-as-at row). */
   openingAnnualBalance?: number | null;
   /** Excel sick days remaining at cutover. */
@@ -76,4 +78,5 @@ export interface LeaveBalance {
   entitled: number;
   taken: number;
   remaining: number;
+  requiresReview?: boolean;
 }

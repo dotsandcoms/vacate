@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { timingSafeEqual } from "node:crypto";
 import { addNotification } from "@/lib/notifications";
+import { correctedEmployeeNo, isUnresolvedJonoCode } from "@/lib/kissflow-corrections";
 
 /**
  * Kissflow → Vacate webhook.
@@ -77,10 +78,14 @@ export async function POST(req: NextRequest) {
   });
 
   // Resolve employee by employee number
+  const employeeNo = correctedEmployeeNo(process.env.KISSFLOW_PROCESS_ID ?? "Staff_Leave_Request", String(payload.requestId)) ?? String(payload.employeeNo);
+  if (isUnresolvedJonoCode(employeeNo)) {
+    return NextResponse.json({ error: "Employee ownership requires review" }, { status: 422 });
+  }
   const { data: emp, error: empErr } = await sb
     .from("employees")
     .select("id,name")
-    .eq("employee_no", payload.employeeNo)
+    .eq("employee_no", employeeNo)
     .single();
   if (empErr || !emp) {
     return NextResponse.json(
@@ -90,6 +95,8 @@ export async function POST(req: NextRequest) {
   }
 
   // Idempotent upsert on the Kissflow request ID — retries won't duplicate.
+  const existing = await sb.from("leave_requests").select("status").eq("kissflow_id", payload.requestId).maybeSingle();
+  if (existing.error) return NextResponse.json({ error: "Database error" }, { status: 500 });
   const { error } = await sb.from("leave_requests").upsert(
     {
       kissflow_id: payload.requestId,
@@ -98,7 +105,7 @@ export async function POST(req: NextRequest) {
       start_date: payload.startDate,
       end_date: payload.endDate,
       days: payload.days,
-      status: "Pending Sync",
+      status: existing.data?.status === "Exported" ? "Exported" : "Pending Sync",
       approved_by: payload.approvedBy ?? null,
       approved_at: payload.approvedAt ?? new Date().toISOString(),
       notes: payload.notes ?? null,

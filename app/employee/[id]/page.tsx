@@ -78,7 +78,7 @@ export default async function EmployeeProfilePage({
       upcoming={upcoming}
       accruedLiabilityR={accruedLiabilityR}
       ytdCostR={ytdCostR}
-      avgDailyCostR={config.avgDailyCostR}
+      canViewFinance={user.role === "admin" || user.role === "cfo"}
     />
   );
 }
