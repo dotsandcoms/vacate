@@ -13,6 +13,7 @@ import {
 import { applyEmployeeStatus } from "./employee-status";
 import { filterReportingWindow } from "./reporting";
 import { correctedEmployeeNoForStoredRequest } from "./kissflow-corrections";
+import { applyLeaveAdjustments } from "./leave-adjustment-store";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -229,6 +230,7 @@ export async function getLeaveRequests(opts?: {
   }
 
   if (activeSource === "mock" || activeSource === "supabase" || activeSource === "kissflow") {
+    requests = await applyLeaveAdjustments(requests);
     return opts?.allDates ? requests : filterReportingWindow(requests);
   }
 
@@ -269,7 +271,7 @@ export async function getLeaveRequests(opts?: {
     }
     return [r];
   });
-  const merged = await applyExportLog([...stored, ...liveRequests.filter((r) => !matchedIds.has(r.id))]);
+  const merged = await applyLeaveAdjustments(await applyExportLog([...stored, ...liveRequests.filter((r) => !matchedIds.has(r.id))]));
   return opts?.allDates ? merged : filterReportingWindow(merged);
 }
 
@@ -295,16 +297,18 @@ export async function getKissflowRegister(opts?: { allDates?: boolean }): Promis
       kissflowEmployees,
       employees
     );
+    const corrected = await applyLeaveAdjustments(await applyExportLog(requests));
     return {
       employees,
-      requests: opts?.allDates ? await applyExportLog(requests) : filterReportingWindow(await applyExportLog(requests)),
+      requests: opts?.allDates ? corrected : filterReportingWindow(corrected),
       source: "kissflow",
       unresolved,
     };
   }
+  const corrected = await applyLeaveAdjustments(await applyExportLog(kissflowRequests));
   return {
     employees: await applyEmployeeStatus(kissflowEmployees),
-    requests: opts?.allDates ? await applyExportLog(kissflowRequests) : filterReportingWindow(await applyExportLog(kissflowRequests)),
+    requests: opts?.allDates ? corrected : filterReportingWindow(corrected),
     source: "kissflow",
     unresolved,
   };

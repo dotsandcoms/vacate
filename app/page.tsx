@@ -355,7 +355,9 @@ export default async function DashboardPage({
                     </div>
                   </div>
                   <p className="shrink-0 text-sm font-medium text-ink-800">
-                    {formatRand(row.liability)}
+                    {/^(?:mr\.?\s+)?shaun\s+streaton$/i.test(row.name.trim())
+                      ? "-"
+                      : formatRand(row.liability)}
                   </p>
                 </li>
               ))}

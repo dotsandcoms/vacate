@@ -7,6 +7,7 @@ import {
   FileText,
 } from "lucide-react";
 import Avatar from "@/components/Avatar";
+import LeaveAdjustmentEditor from "@/components/LeaveAdjustmentEditor";
 import { formatRand } from "@/lib/balances";
 import { isActiveEmployee, statusStyles, typeColors } from "@/lib/utils";
 import { humanDate, humanRange } from "@/lib/holidays";
@@ -27,6 +28,7 @@ type Props = {
   accruedLiabilityR: number | null;
   ytdCostR: number;
   canViewFinance: boolean;
+  canAdjustLeave?: boolean;
 };
 
 /**
@@ -46,6 +48,7 @@ export default function EmployeeProfileView({
   accruedLiabilityR,
   ytdCostR,
   canViewFinance,
+  canAdjustLeave = false,
 }: Props) {
   return (
     <div className="space-y-6">
@@ -305,6 +308,8 @@ export default function EmployeeProfileView({
                     {r.status === "Rejected" && r.rejectionReason && <p className="leave-history-rejection">Rejected{r.rejectedBy ? ` by ${r.rejectedBy}` : ""}: {r.rejectionReason}</p>}
                     <p className="leave-history-reference"><span className="leave-history-label">Kissflow ref</span><span>{r.kissflowId}</span></p>
                   </div>
+                  {r.adjustment && <p className="mt-2 text-xs text-slate-500">Corrected by {r.adjustment.adjustedBy} · {humanDate(r.adjustment.adjustedAt.slice(0, 10))} · {r.adjustment.reason}</p>}
+                  {canAdjustLeave && <LeaveAdjustmentEditor request={r} />}
                 </li>
               ))}
             </ul>

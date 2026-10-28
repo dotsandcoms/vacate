@@ -79,6 +79,7 @@ export default async function EmployeeProfilePage({
       accruedLiabilityR={accruedLiabilityR}
       ytdCostR={ytdCostR}
       canViewFinance={user.role === "admin" || user.role === "cfo"}
+      canAdjustLeave={user.role === "admin"}
     />
   );
 }

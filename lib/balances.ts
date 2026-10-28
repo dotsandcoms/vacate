@@ -61,6 +61,28 @@ function takenInWindow(
     .reduce((s, r) => s + r.days, 0);
 }
 
+/** Correct leave already included in an imported opening, once per request. */
+function openingCorrection(
+  requests: LeaveRequest[], employeeId: string, type: LeaveType, openingDate: string
+): { days: number; requiresReview: boolean } {
+  let days = 0;
+  let requiresReview = false;
+  const end = addDaysIso(openingDate, -1);
+  const from = type === "Family Responsibility" ? `${openingDate.slice(0, 4)}-01-01` : "0001-01-01";
+  for (const request of requests) {
+    if (request.employeeId !== employeeId || !request.adjustment) continue;
+    const original = { ...request, ...request.adjustment.original };
+    const before = takenAfter([original], employeeId, type, from, end);
+    const after = takenAfter([request], employeeId, type, from, end);
+    if (before.requiresReview || after.requiresReview) {
+      requiresReview = true;
+      continue;
+    }
+    days += before.days - after.days;
+  }
+  return { days: roundDays(days), requiresReview };
+}
+
 /** Month-ends on or after the opening date, through the current date. */
 export function monthsAccruedAfter(asOfIso: string, todayIsoDate: string): number {
   if (todayIsoDate < asOfIso) return 0;
@@ -106,11 +128,14 @@ export function computeBalancesBcea(
       const annualAccrual = accruedMonths * (emp.monthlyAccrual ?? config.annualAccrualPerMonth);
 
       const annualTaken = takenAfter(requests, emp.id, "Annual", openingDate);
-      const annualOpening = emp.openingAnnualBalance;
+      const annualCorrection = openingCorrection(requests, emp.id, "Annual", openingDate);
+      const annualOpening = emp.openingAnnualBalance == null ? null : emp.openingAnnualBalance + annualCorrection.days;
+
+      const sickCorrection = openingCorrection(requests, emp.id, "Sick", openingDate);
 
       const sickOpening =
         emp.openingSickBalance != null
-          ? emp.openingSickBalance
+          ? emp.openingSickBalance + sickCorrection.days
           : emp.sickEntitlement;
       const sickTaken =
         emp.openingSickBalance != null
@@ -119,7 +144,8 @@ export function computeBalancesBcea(
       const sickRemaining = roundDays(sickOpening - sickTaken.days);
 
       const openingYear = Number(openingDate.slice(0, 4));
-      const frOpening = year > openingYear ? 3 : emp.openingFamilyBalance ?? 3;
+      const frCorrection = openingCorrection(requests, emp.id, "Family Responsibility", openingDate);
+      const frOpening = year > openingYear ? 3 : (emp.openingFamilyBalance ?? 3) + (emp.openingFamilyBalance != null ? frCorrection.days : 0);
       const frFrom = year > openingYear ? `${year}-01-01` : openingDate;
       const frTaken =
         emp.openingFamilyBalance != null
@@ -141,7 +167,7 @@ export function computeBalancesBcea(
           entitled: roundDays(annualOpening + annualAccrual),
           taken: annualTaken.days,
           remaining: roundDays(annualOpening + annualAccrual - annualTaken.days),
-          requiresReview: annualTaken.requiresReview,
+          requiresReview: annualTaken.requiresReview || annualCorrection.requiresReview,
         });
       }
       balances.push(
@@ -151,7 +177,7 @@ export function computeBalancesBcea(
           entitled: roundDays(emp.sickEntitlement),
           taken: roundDays(emp.sickEntitlement - sickOpening + sickTaken.days),
           remaining: sickRemaining,
-          requiresReview: sickTaken.requiresReview,
+          requiresReview: sickTaken.requiresReview || (emp.openingSickBalance != null && sickCorrection.requiresReview),
         },
         {
           employeeId: emp.id,
@@ -159,7 +185,7 @@ export function computeBalancesBcea(
           entitled: 3,
           taken: roundDays(3 - frOpening + frTaken.days),
           remaining: frRemaining,
-          requiresReview: frTaken.requiresReview,
+          requiresReview: frTaken.requiresReview || (year <= openingYear && emp.openingFamilyBalance != null && frCorrection.requiresReview),
         }
       );
       continue;

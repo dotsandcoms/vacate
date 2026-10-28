@@ -70,6 +70,13 @@ export interface LeaveRequest {
   approvalProgress?: number;
   /** Name of the workflow step the item is currently sitting at. */
   currentStep?: string;
+  /** Most recent saved manual correction. Original source and export locks are retained. */
+  adjustment?: {
+    reason: string;
+    adjustedBy: string;
+    adjustedAt: string;
+    original: Pick<LeaveRequest, "type" | "startDate" | "endDate" | "days">;
+  };
 }
 
 export interface LeaveBalance {
