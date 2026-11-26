@@ -68,13 +68,16 @@ Git connection; third-party Vercel integrations should be checked afterwards.
 
 ## Manual leave corrections
 
-Apply `supabase/migrations/20261028113107_manual_leave_adjustments.sql` before
+Apply `supabase/migrations/20261028113107_manual_leave_adjustments.sql` and
+`supabase/migrations/20261126131000_leave_adjustment_exclude.sql` before
 deploying the correction editor. Administrators can open an employee and select
-**Edit leave** beneath a leave movement to change its type, dates or days and
-record a reason. Corrections survive Kissflow refreshes and appear throughout
-the dashboard, employee profile, register and future payroll exports. Previous
-values, the administrator and the reason are retained in an append-only audit.
-Existing payroll files and export locks are retained.
+**Edit leave** beneath a leave movement to change its type, dates or days, or
+**Do not count** to stop a Kissflow duplicate or incorrect approval reducing
+balances while keeping the row for audit. **Restore leave** brings it back.
+Corrections survive Kissflow refreshes and appear throughout the dashboard,
+employee profile, register and future payroll exports. Previous values, the
+administrator and the reason are retained in an append-only audit. Existing
+payroll files and export locks are retained.
 
 Corrections to leave before an imported opening date also adjust the effective
 opening balance: moving two days from annual to sick restores two annual days

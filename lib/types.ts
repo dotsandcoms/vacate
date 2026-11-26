@@ -75,6 +75,8 @@ export interface LeaveRequest {
     reason: string;
     adjustedBy: string;
     adjustedAt: string;
+    /** When true, balances/payroll ignore this Kissflow movement; the row stays for audit. */
+    excluded?: boolean;
     original: Pick<LeaveRequest, "type" | "startDate" | "endDate" | "days">;
   };
 }

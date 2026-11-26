@@ -4,6 +4,7 @@ import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { Info, Search, X } from "lucide-react";
+import { leaveDisplayStatus } from "@/lib/leave-adjustments";
 import { Employee, LeaveRequest } from "@/lib/types";
 import { statusStyles } from "@/lib/utils";
 import { humanDate, humanRange } from "@/lib/holidays";
@@ -228,9 +229,9 @@ export default function RegisterTable({
                   <td className="px-3 py-3 sm:px-5">
                     <span className="inline-flex items-center">
                       <span
-                        className={`rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ${statusStyles[r.status]}`}
+                        className={`rounded-full px-2.5 py-0.5 text-xs font-medium ring-1 ${statusStyles[leaveDisplayStatus(r)] ?? statusStyles[r.status]}`}
                       >
-                        {r.status}
+                        {leaveDisplayStatus(r)}
                       </span>
                       {r.status === "Rejected" && <RejectionInfo request={r} />}
                     </span>

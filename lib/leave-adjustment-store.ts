@@ -9,7 +9,7 @@ export async function applyLeaveAdjustments(requests: LeaveRequest[]): Promise<L
   for (let offset = 0; ; offset += 1000) {
     const { data, error } = await admin
       .from("leave_request_adjustments")
-      .select("employee_id,kissflow_id,type,start_date,end_date,days,reason,adjusted_by_name,created_at,previous_values")
+      .select("employee_id,kissflow_id,type,start_date,end_date,days,reason,excluded,adjusted_by_name,created_at,previous_values")
       .order("id")
       .range(offset, offset + 999);
     if (error) throw new Error("Leave corrections could not be loaded. Check the manual_leave_adjustments migration.");

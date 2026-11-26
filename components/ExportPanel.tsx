@@ -26,7 +26,7 @@ export default function ExportPanel({ employees, requests }: { employees: Employ
     setBatches(body);
   };
   useEffect(() => { loadHistory().catch(e => setError(e.message)); }, []);
-  const pending = requests.filter(r => r.status === 'Approved' && !batches.some(b => b.requestIds.includes(r.id)));
+  const pending = requests.filter(r => r.status === 'Approved' && !r.adjustment?.excluded && !batches.some(b => b.requestIds.includes(r.id)));
   const periodInvalid = Boolean(from && to && from > to);
   const inPeriod = pending.filter(r => (!from || r.startDate >= from) && (!to || r.startDate <= to));
   const rows = inPeriod.map(r => ({ request: r, employee: employees.find(e => e.id === r.employeeId), ...payrollRow(r, employees.find(e => e.id === r.employeeId), options, remarks[r.id] ?? r.kissflowId) }));

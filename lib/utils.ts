@@ -21,6 +21,7 @@ export const statusStyles: Record<string, string> = {
   Exported: "bg-emerald-100 text-emerald-800 ring-emerald-700/20",
   Rejected: "bg-red-50 text-red-700 ring-red-600/20",
   Cancelled: "bg-slate-50 text-slate-400 ring-slate-400/20 line-through",
+  "Not counted": "bg-slate-100 text-slate-500 ring-slate-400/30 line-through",
 };
 
 // One hue family + warm exceptions — deliberately not a rainbow.

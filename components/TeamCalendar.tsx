@@ -38,7 +38,7 @@ export default function TeamCalendar({
   );
 
   const active = useMemo(
-    () => requests.filter((r) => r.status !== "Cancelled"),
+    () => requests.filter((r) => r.status !== "Cancelled" && !r.adjustment?.excluded),
     [requests]
   );
 

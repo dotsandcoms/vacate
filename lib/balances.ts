@@ -9,8 +9,13 @@
 import { Employee, LeaveRequest, LeaveBalance, LeaveType } from "./types";
 import { config } from "./config";
 import { addDaysIso, todayIso, workingDays } from "./holidays";
+import { isLeaveCounted } from "./leave-adjustments";
 
 const COUNTED_STATUSES = new Set(["Approved", "Pending Sync", "Exported"]);
+
+function countsTowardBalance(request: LeaveRequest): boolean {
+  return isLeaveCounted(request) && COUNTED_STATUSES.has(request.status);
+}
 
 function roundDays(n: number): number {
   return Math.sign(n) * Math.round((Math.abs(n) + Number.EPSILON) * 100) / 100;
@@ -27,7 +32,7 @@ function takenAfter(
   let requiresReview = false;
   for (const r of requests) {
     if (r.employeeId !== employeeId || r.type !== type ||
-        !COUNTED_STATUSES.has(r.status) || r.endDate < fromIso ||
+        !countsTowardBalance(r) || r.endDate < fromIso ||
         (toIso && r.startDate > toIso)) continue;
     const start = r.startDate < fromIso ? fromIso : r.startDate;
     const end = toIso && r.endDate > toIso ? toIso : r.endDate;
@@ -54,7 +59,7 @@ function takenInWindow(
       (r) =>
         r.employeeId === employeeId &&
         r.type === type &&
-        COUNTED_STATUSES.has(r.status) &&
+        countsTowardBalance(r) &&
         r.startDate >= fromIso &&
         r.startDate <= toIso
     )
@@ -71,7 +76,10 @@ function openingCorrection(
   const from = type === "Family Responsibility" ? `${openingDate.slice(0, 4)}-01-01` : "0001-01-01";
   for (const request of requests) {
     if (request.employeeId !== employeeId || !request.adjustment) continue;
-    const original = { ...request, ...request.adjustment.original };
+    // Rebuild the pre-correction row without the overlay so exclusions and type
+    // changes both reverse correctly against the imported opening.
+    const { adjustment: _adjustment, ...base } = request;
+    const original = { ...base, ...request.adjustment.original };
     const before = takenAfter([original], employeeId, type, from, end);
     const after = takenAfter([request], employeeId, type, from, end);
     if (before.requiresReview || after.requiresReview) {
@@ -282,7 +290,7 @@ export function leaveLiabilityR(
 
 /**
  * Estimated Rand cost of leave taken in a date window for one employee
- * (or all if empId omitted). Excludes Cancelled & Rejected.
+ * (or all if empId omitted). Excludes Cancelled, Rejected and not-counted overrides.
  */
 export function ytdLeaveCostR(
   requests: LeaveRequest[],
@@ -295,6 +303,7 @@ export function ytdLeaveCostR(
   return requests
     .filter(
       (r) =>
+        isLeaveCounted(r) &&
         r.status !== "Cancelled" &&
         r.status !== "Rejected" &&
         r.startDate >= fromIso &&
@@ -314,7 +323,7 @@ export function payrollQueueCostR(
 ): number {
   const byId = Object.fromEntries(employees.map((e) => [e.id, e]));
   return requests
-    .filter((r) => r.status === "Approved")
+    .filter((r) => r.status === "Approved" && isLeaveCounted(r))
     .reduce(
       (sum, r) => sum + r.days * (employeeDailyCost(byId[r.employeeId]) ?? 0),
       0

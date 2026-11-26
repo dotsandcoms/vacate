@@ -9,6 +9,7 @@ import {
 import Avatar from "@/components/Avatar";
 import LeaveAdjustmentEditor from "@/components/LeaveAdjustmentEditor";
 import { formatRand } from "@/lib/balances";
+import { leaveDisplayStatus } from "@/lib/leave-adjustments";
 import { isActiveEmployee, statusStyles, typeColors } from "@/lib/utils";
 import { humanDate, humanRange } from "@/lib/holidays";
 import { reportingFromLabel, reportingWindowLabel } from "@/lib/reporting";
@@ -300,7 +301,7 @@ export default function EmployeeProfileView({
                     <div className="leave-history-date"><span>{humanRange(r.startDate, r.endDate)}</span><small>{r.startDate.slice(0, 4) === r.endDate.slice(0, 4) ? r.startDate.slice(0, 4) : `${r.startDate.slice(0, 4)} – ${r.endDate.slice(0, 4)}`}</small></div>
                     <div className="leave-history-type"><span aria-hidden="true" style={{ backgroundColor: typeColors[r.type] ?? "#94a3b8" }} />{r.type}</div>
                     <div className="leave-history-days">{r.days}<span> {r.days === 1 ? 'day' : 'days'}</span></div>
-                    <span className={`leave-history-status rounded-full text-xs font-medium ring-1 ${statusStyles[r.status]}`}>{r.status}</span>
+                    <span className={`leave-history-status rounded-full text-xs font-medium ring-1 ${statusStyles[leaveDisplayStatus(r)] ?? statusStyles[r.status]}`}>{leaveDisplayStatus(r)}</span>
                   </div>
                   <div className="leave-history-details">
                     {(r.approvedBy || r.approvedAt) && <p><span className="leave-history-label">Actioned</span>{r.approvedBy && <span>by {r.approvedBy}</span>}{r.approvedAt && <span className="leave-history-action-date">{humanDate(r.approvedAt.slice(0, 10))}</span>}</p>}
@@ -308,7 +309,12 @@ export default function EmployeeProfileView({
                     {r.status === "Rejected" && r.rejectionReason && <p className="leave-history-rejection">Rejected{r.rejectedBy ? ` by ${r.rejectedBy}` : ""}: {r.rejectionReason}</p>}
                     <p className="leave-history-reference"><span className="leave-history-label">Kissflow ref</span><span>{r.kissflowId}</span></p>
                   </div>
-                  {r.adjustment && <p className="mt-2 text-xs text-slate-500">Corrected by {r.adjustment.adjustedBy} · {humanDate(r.adjustment.adjustedAt.slice(0, 10))} · {r.adjustment.reason}</p>}
+                  {r.adjustment && (
+                    <p className="mt-2 text-xs text-slate-500">
+                      {r.adjustment.excluded ? "Not counted by" : "Corrected by"}{" "}
+                      {r.adjustment.adjustedBy} · {humanDate(r.adjustment.adjustedAt.slice(0, 10))} · {r.adjustment.reason}
+                    </p>
+                  )}
                   {canAdjustLeave && <LeaveAdjustmentEditor request={r} />}
                 </li>
               ))}

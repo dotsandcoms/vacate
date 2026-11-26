@@ -7,6 +7,7 @@ import {
 import { computeBalances, getEmployees, getLeaveRequests } from "@/lib/data";
 import { todayIso } from "@/lib/holidays";
 import { config } from "@/lib/config";
+import { isLeaveCounted } from "@/lib/leave-adjustments";
 import { isTakenYtd, reportingFrom } from "@/lib/reporting";
 import { requireUser, scopeRequests } from "@/lib/auth";
 
@@ -39,7 +40,7 @@ export default async function EmployeeProfilePage({
 
   const today = todayIso();
   const active = history.filter(
-    (r) => r.status !== "Cancelled" && r.status !== "Rejected"
+    (r) => isLeaveCounted(r) && r.status !== "Cancelled" && r.status !== "Rejected"
   );
   const daysYtd = active
     .filter((r) => isTakenYtd(r.startDate, today))

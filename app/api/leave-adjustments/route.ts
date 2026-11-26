@@ -24,10 +24,40 @@ export async function POST(request: NextRequest) {
       (row) => row.id === input.requestId && row.employeeId === input.employeeId
     );
     if (!existing) return NextResponse.json({ error: "Leave record not found. Refresh the page and try again." }, { status: 404 });
+
+    const currentlyExcluded = existing.adjustment?.excluded === true;
+    if (input.excluded === true) {
+      if (currentlyExcluded) {
+        return NextResponse.json({ error: "This leave is already marked as not counted." }, { status: 400 });
+      }
+      const { error } = await createAdminSupabaseClient().from("leave_request_adjustments").insert({
+        employee_id: existing.employeeId,
+        kissflow_id: existing.kissflowId,
+        type: existing.type,
+        start_date: existing.startDate,
+        end_date: existing.endDate,
+        days: existing.days,
+        reason: input.reason,
+        excluded: true,
+        previous_values: {
+          type: existing.type,
+          startDate: existing.startDate,
+          endDate: existing.endDate,
+          days: existing.days,
+        },
+        adjusted_by: auth.user.id,
+        adjusted_by_name: auth.user.name,
+      });
+      if (error) throw error;
+      return NextResponse.json({ ok: true });
+    }
+
     if (existing.type === input.type && existing.startDate === input.startDate
-        && existing.endDate === input.endDate && existing.days === input.days) {
+        && existing.endDate === input.endDate && existing.days === input.days
+        && !currentlyExcluded) {
       return NextResponse.json({ error: "Change the leave type, dates or days before saving." }, { status: 400 });
     }
+
     const { error } = await createAdminSupabaseClient().from("leave_request_adjustments").insert({
       employee_id: existing.employeeId,
       kissflow_id: existing.kissflowId,
@@ -36,7 +66,13 @@ export async function POST(request: NextRequest) {
       end_date: input.endDate,
       days: input.days,
       reason: input.reason,
-      previous_values: { type: existing.type, startDate: existing.startDate, endDate: existing.endDate, days: existing.days },
+      excluded: false,
+      previous_values: {
+        type: existing.type,
+        startDate: existing.startDate,
+        endDate: existing.endDate,
+        days: existing.days,
+      },
       adjusted_by: auth.user.id,
       adjusted_by_name: auth.user.name,
     });

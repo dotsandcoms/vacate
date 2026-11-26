@@ -104,7 +104,7 @@ export default async function DashboardPage({
   const awaitingApproval = requests.filter(
     (r) => r.status === "Awaiting Approval"
   );
-  const pendingSync = requests.filter((r) => r.status === "Approved");
+  const pendingSync = requests.filter((r) => r.status === "Approved" && !r.adjustment?.excluded);
   const daysYtd = active
     .filter((r) => isTakenYtd(r.startDate, today))
     .reduce((s, r) => s + r.days, 0);
