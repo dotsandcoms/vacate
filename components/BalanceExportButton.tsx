@@ -15,7 +15,9 @@ export default function BalanceExportButton() {
     try {
       const params = new URLSearchParams();
       const department = searchParams.get("department")?.trim();
+      const leaveType = searchParams.get("leaveType")?.trim();
       if (department) params.set("department", department);
+      if (leaveType) params.set("leaveType", leaveType);
       const response = await fetch(`/api/balances/export${params.size ? `?${params}` : ""}`, {
         cache: "no-store",
       });
@@ -41,18 +43,19 @@ export default function BalanceExportButton() {
   }
 
   return (
-    <div className="flex flex-col items-stretch gap-1 sm:items-end">
+    <div className="relative">
       <button
         type="button"
         onClick={download}
         disabled={busy}
-        className="inline-flex min-h-9 items-center justify-center gap-2 rounded-xl border border-white/60 bg-white/70 px-3 text-sm font-medium text-ink-900 shadow-sm transition-[background-color,transform] hover:bg-white active:scale-[0.98] disabled:opacity-60"
+        aria-busy={busy}
+        className="inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-xl border border-white/60 bg-white/70 px-3 text-sm font-medium text-ink-900 shadow-sm transition-[background-color,transform] hover:bg-white active:scale-[0.98] disabled:opacity-60"
       >
         <Download className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" />
         {busy ? "Preparing…" : "Export balances"}
       </button>
       {error && (
-        <p role="alert" className="max-w-56 text-xs text-red-700 sm:text-right">
+        <p role="alert" className="absolute left-0 top-full z-10 mt-1 max-w-56 rounded-lg bg-white px-2 py-1 text-xs text-red-700 shadow-sm ring-1 ring-red-100 sm:left-auto sm:right-0">
           {error}
         </p>
       )}

@@ -1,6 +1,14 @@
 import ExcelJS from "exceljs";
-import type { Employee, LeaveBalance } from "./types";
+import type { Employee, LeaveBalance, LeaveType } from "./types";
 import { todayIso } from "./holidays";
+
+export const BALANCE_EXPORT_LEAVE_TYPES = [
+  "Annual",
+  "Sick",
+  "Family Responsibility",
+] as const satisfies readonly LeaveType[];
+
+export type BalanceExportLeaveType = (typeof BALANCE_EXPORT_LEAVE_TYPES)[number];
 
 export type BalanceExportRow = {
   employeeNo: string;
@@ -27,6 +35,13 @@ function balanceFor(
   type: LeaveBalance["type"]
 ): LeaveBalance | undefined {
   return balances.find((row) => row.employeeId === employeeId && row.type === type);
+}
+
+export function parseBalanceExportLeaveType(value: string | null | undefined): BalanceExportLeaveType | null {
+  const trimmed = value?.trim();
+  return BALANCE_EXPORT_LEAVE_TYPES.includes(trimmed as BalanceExportLeaveType)
+    ? (trimmed as BalanceExportLeaveType)
+    : null;
 }
 
 export function buildBalanceExportRows(
@@ -60,11 +75,43 @@ export function buildBalanceExportRows(
     });
 }
 
+function leaveTypeColumns(leaveType: BalanceExportLeaveType | null): Partial<ExcelJS.Column>[] {
+  const annual = [
+    { header: "Annual entitled", key: "annualEntitled", width: 15 },
+    { header: "Annual taken", key: "annualTaken", width: 13 },
+    { header: "Annual remaining", key: "annualRemaining", width: 16 },
+  ];
+  const sick = [
+    { header: "Sick entitled", key: "sickEntitled", width: 13 },
+    { header: "Sick taken", key: "sickTaken", width: 12 },
+    { header: "Sick remaining", key: "sickRemaining", width: 14 },
+  ];
+  const family = [
+    { header: "Family entitled", key: "familyEntitled", width: 14 },
+    { header: "Family taken", key: "familyTaken", width: 13 },
+    { header: "Family remaining", key: "familyRemaining", width: 16 },
+  ];
+  if (leaveType === "Annual") return annual;
+  if (leaveType === "Sick") return sick;
+  if (leaveType === "Family Responsibility") return family;
+  return [...annual, ...sick, ...family];
+}
+
+function slugPart(value: string): string {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+}
+
 export async function buildBalanceWorkbook(
   rows: BalanceExportRow[],
-  options: { includeFinance: boolean; department?: string | null; asOf?: string }
+  options: {
+    includeFinance: boolean;
+    department?: string | null;
+    leaveType?: BalanceExportLeaveType | null;
+    asOf?: string;
+  }
 ): Promise<ArrayBuffer> {
   const asOf = options.asOf ?? todayIso();
+  const leaveType = options.leaveType ?? null;
   const workbook = new ExcelJS.Workbook();
   workbook.creator = "Vacate";
   workbook.created = new Date(`${asOf}T00:00:00Z`);
@@ -78,15 +125,7 @@ export async function buildBalanceWorkbook(
     { header: "Name", key: "name", width: 28 },
     { header: "Department", key: "department", width: 22 },
     { header: "Role", key: "role", width: 22 },
-    { header: "Annual entitled", key: "annualEntitled", width: 15 },
-    { header: "Annual taken", key: "annualTaken", width: 13 },
-    { header: "Annual remaining", key: "annualRemaining", width: 16 },
-    { header: "Sick entitled", key: "sickEntitled", width: 13 },
-    { header: "Sick taken", key: "sickTaken", width: 12 },
-    { header: "Sick remaining", key: "sickRemaining", width: 14 },
-    { header: "Family entitled", key: "familyEntitled", width: 14 },
-    { header: "Family taken", key: "familyTaken", width: 13 },
-    { header: "Family remaining", key: "familyRemaining", width: 16 },
+    ...leaveTypeColumns(leaveType),
     { header: "Monthly accrual", key: "monthlyAccrual", width: 15 },
     { header: "Opening as of", key: "openingBalanceAsOf", width: 14 },
   ];
@@ -105,18 +144,24 @@ export async function buildBalanceWorkbook(
       name: row.name,
       department: row.department,
       role: row.role,
-      annualEntitled: row.annualEntitled,
-      annualTaken: row.annualTaken,
-      annualRemaining: row.annualRemaining,
-      sickEntitled: row.sickEntitled,
-      sickTaken: row.sickTaken,
-      sickRemaining: row.sickRemaining,
-      familyEntitled: row.familyEntitled,
-      familyTaken: row.familyTaken,
-      familyRemaining: row.familyRemaining,
       monthlyAccrual: row.monthlyAccrual,
       openingBalanceAsOf: row.openingBalanceAsOf,
     };
+    if (!leaveType || leaveType === "Annual") {
+      values.annualEntitled = row.annualEntitled;
+      values.annualTaken = row.annualTaken;
+      values.annualRemaining = row.annualRemaining;
+    }
+    if (!leaveType || leaveType === "Sick") {
+      values.sickEntitled = row.sickEntitled;
+      values.sickTaken = row.sickTaken;
+      values.sickRemaining = row.sickRemaining;
+    }
+    if (!leaveType || leaveType === "Family Responsibility") {
+      values.familyEntitled = row.familyEntitled;
+      values.familyTaken = row.familyTaken;
+      values.familyRemaining = row.familyRemaining;
+    }
     if (options.includeFinance) values.dailyCostR = row.dailyCostR ?? null;
     sheet.addRow(values);
   }
@@ -139,6 +184,10 @@ export async function buildBalanceWorkbook(
     value: options.department?.trim() || "All departments",
   });
   meta.addRow({
+    field: "Leave type filter",
+    value: leaveType || "All leave types",
+  });
+  meta.addRow({
     field: "Finance columns",
     value: options.includeFinance ? "Included" : "Hidden",
   });
@@ -146,9 +195,16 @@ export async function buildBalanceWorkbook(
   return workbook.xlsx.writeBuffer();
 }
 
-export function balanceExportFilename(department?: string | null, asOf = todayIso()): string {
-  const scope = department?.trim()
-    ? department.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")
-    : "all-staff";
-  return `leave-balances-${scope}-${asOf}.xlsx`;
+export function balanceExportFilename(
+  department?: string | null,
+  leaveType?: BalanceExportLeaveType | null,
+  asOf = todayIso()
+): string {
+  const parts = [
+    "leave-balances",
+    department?.trim() ? slugPart(department) : "all-staff",
+    leaveType ? slugPart(leaveType) : null,
+    asOf,
+  ].filter(Boolean);
+  return `${parts.join("-")}.xlsx`;
 }

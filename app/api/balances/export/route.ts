@@ -3,6 +3,7 @@ import {
   balanceExportFilename,
   buildBalanceExportRows,
   buildBalanceWorkbook,
+  parseBalanceExportLeaveType,
 } from "@/lib/balance-export";
 import { canAccessPayroll, scopeRequests } from "@/lib/auth";
 import { computeBalances, getEmployees, getLeaveRequests } from "@/lib/data";
@@ -17,6 +18,7 @@ export async function GET(request: NextRequest) {
   if (auth.response) return auth.response;
 
   const departmentParam = request.nextUrl.searchParams.get("department")?.trim() || null;
+  const leaveType = parseBalanceExportLeaveType(request.nextUrl.searchParams.get("leaveType"));
   const asOf = todayIso();
 
   try {
@@ -25,20 +27,27 @@ export async function GET(request: NextRequest) {
       getLeaveRequests({ allDates: true }),
     ]);
     const scoped = scopeRequests(auth.user!, activeEmployees(allStaff), allRequests);
-    const departments = new Set(scoped.employees.map((employee) => employee.department));
-    const department =
-      departmentParam && departments.has(departmentParam) ? departmentParam : null;
+    const departmentMatch = departmentParam
+      ? scoped.employees.find(
+          (employee) => employee.department.toLowerCase() === departmentParam.toLowerCase()
+        )?.department ?? null
+      : null;
 
-    const employees = department
-      ? scoped.employees.filter((employee) => employee.department === department)
+    const employees = departmentMatch
+      ? scoped.employees.filter((employee) => employee.department === departmentMatch)
       : scoped.employees;
     const employeeIds = new Set(employees.map((employee) => employee.id));
     const requests = scoped.requests.filter((row) => employeeIds.has(row.employeeId));
     const balances = computeBalances(employees, requests);
     const rows = buildBalanceExportRows(employees, balances);
     const includeFinance = canAccessPayroll(auth.user!);
-    const buffer = await buildBalanceWorkbook(rows, { includeFinance, department, asOf });
-    const filename = balanceExportFilename(department, asOf);
+    const buffer = await buildBalanceWorkbook(rows, {
+      includeFinance,
+      department: departmentMatch,
+      leaveType,
+      asOf,
+    });
+    const filename = balanceExportFilename(departmentMatch, leaveType, asOf);
 
     return new NextResponse(Buffer.from(buffer), {
       status: 200,

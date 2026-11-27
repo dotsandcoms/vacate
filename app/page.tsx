@@ -236,30 +236,39 @@ export default async function DashboardPage({
             <p className="mt-1 text-xs text-slate-500">Opening balances as at 1 November 2026 · approved future leave is reserved</p>
           )}
         </div>
-        <div className="flex w-full flex-wrap items-center gap-3 sm:w-auto">
-          <Suspense
-            fallback={
-              <div className="h-9 w-44 rounded-xl border border-white/60 bg-white/50" />
-            }
-          >
-            <DepartmentFilter
-              departments={departments}
-              selected={department}
-            />
-            <LeaveTypeFilter
-              leaveTypes={DASHBOARD_LEAVE_TYPES}
-              selected={leaveType}
-            />
-          </Suspense>
-          <EmployeeSearch employees={allEmployees.map(({ dailyCostR, ...employee }) => employee)} />
-          <Suspense
-            fallback={
-              <div className="h-9 w-36 rounded-xl border border-white/60 bg-white/50" />
-            }
-          >
-            <BalanceExportButton />
-          </Suspense>
-          {(user.role === "admin" || user.role === "cfo") && <NotificationBell />}
+        <div className="flex w-full flex-col gap-3 sm:w-auto lg:items-end">
+          <div className="flex flex-wrap items-center gap-3">
+            <Suspense
+              fallback={
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="h-9 w-44 rounded-xl border border-white/60 bg-white/50" />
+                  <div className="h-9 w-40 rounded-xl border border-white/60 bg-white/50" />
+                </div>
+              }
+            >
+              <div className="flex flex-wrap items-center gap-3">
+                <DepartmentFilter
+                  departments={departments}
+                  selected={department}
+                />
+                <LeaveTypeFilter
+                  leaveTypes={DASHBOARD_LEAVE_TYPES}
+                  selected={leaveType}
+                />
+              </div>
+            </Suspense>
+            <EmployeeSearch employees={allEmployees.map(({ dailyCostR, ...employee }) => employee)} />
+          </div>
+          <div className="flex shrink-0 items-center gap-2 self-start sm:self-end">
+            <Suspense
+              fallback={
+                <div className="h-9 w-36 rounded-xl border border-white/60 bg-white/50" />
+              }
+            >
+              <BalanceExportButton />
+            </Suspense>
+            {(user.role === "admin" || user.role === "cfo") && <NotificationBell />}
+          </div>
         </div>
       </header>
 
