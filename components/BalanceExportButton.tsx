@@ -1,0 +1,61 @@
+"use client";
+
+import { useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { Download } from "lucide-react";
+
+export default function BalanceExportButton() {
+  const searchParams = useSearchParams();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function download() {
+    setBusy(true);
+    setError(null);
+    try {
+      const params = new URLSearchParams();
+      const department = searchParams.get("department")?.trim();
+      if (department) params.set("department", department);
+      const response = await fetch(`/api/balances/export${params.size ? `?${params}` : ""}`, {
+        cache: "no-store",
+      });
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({}));
+        throw new Error(body.error ?? "Unable to export leave balances.");
+      }
+      const blob = await response.blob();
+      const disposition = response.headers.get("Content-Disposition") ?? "";
+      const matched = /filename="([^"]+)"/i.exec(disposition);
+      const filename = matched?.[1] ?? "leave-balances.xlsx";
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Unable to export leave balances.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="flex flex-col items-stretch gap-1 sm:items-end">
+      <button
+        type="button"
+        onClick={download}
+        disabled={busy}
+        className="inline-flex min-h-9 items-center justify-center gap-2 rounded-xl border border-white/60 bg-white/70 px-3 text-sm font-medium text-ink-900 shadow-sm transition-[background-color,transform] hover:bg-white active:scale-[0.98] disabled:opacity-60"
+      >
+        <Download className="h-4 w-4" strokeWidth={1.75} aria-hidden="true" />
+        {busy ? "Preparing…" : "Export balances"}
+      </button>
+      {error && (
+        <p role="alert" className="max-w-56 text-xs text-red-700 sm:text-right">
+          {error}
+        </p>
+      )}
+    </div>
+  );
+}

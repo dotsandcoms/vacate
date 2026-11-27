@@ -5,6 +5,7 @@ import DashboardAccordion from "@/components/DashboardAccordion";
 import DashboardCharts from "@/components/DashboardCharts";
 import DepartmentFilter from "@/components/DepartmentFilter";
 import LeaveTypeFilter from "@/components/LeaveTypeFilter";
+import BalanceExportButton from "@/components/BalanceExportButton";
 import NotificationBell from "@/components/NotificationBell";
 import EmployeeSearch from "@/components/EmployeeSearch";
 import Avatar from "@/components/Avatar";
@@ -251,6 +252,13 @@ export default async function DashboardPage({
             />
           </Suspense>
           <EmployeeSearch employees={allEmployees.map(({ dailyCostR, ...employee }) => employee)} />
+          <Suspense
+            fallback={
+              <div className="h-9 w-36 rounded-xl border border-white/60 bg-white/50" />
+            }
+          >
+            <BalanceExportButton />
+          </Suspense>
           {(user.role === "admin" || user.role === "cfo") && <NotificationBell />}
         </div>
       </header>
